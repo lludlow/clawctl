@@ -276,7 +276,7 @@ def review_task(conn, task_id, agent, meta=None):
         if not row:
             return False, "not found"
         return False, f"not owned by you (owner: {row['owner']})"
-    log_activity(conn, agent, "task_review", "task", task_id, meta=meta)
+    log_activity(conn, agent, "task_reviewed", "task", task_id, meta=meta)
     return True, None
 
 

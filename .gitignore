@@ -1,0 +1,8 @@
+test.db*
+*.db
+*.egg-info/
+__pycache__/
+dist/
+build/
+.venv/
+.claude/

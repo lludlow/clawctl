@@ -6,6 +6,18 @@ Shared coordination layer for OpenClaw agent fleets. Provides a task board, inte
 
 Run `clawctl init` to create the database. Set your identity: `export CLAW_AGENT=your-name`
 
+## Fleet Roster
+
+| Agent | Role | Notes |
+|-------|------|-------|
+| `chat` | Everyday triage & delegation | Handles most messages, delegates complex work to specialists |
+| `research` | Deep reasoning & web search | Long-form analysis, comparisons, recommendations |
+| `coding` | Sandboxed code execution | Writes and tests scripts/tools in isolation |
+| `notes` | Knowledge graph & note-taking | Files research, maintains Obsidian-style workspace |
+| `trading` | Read-only market analysis | Market commentary only — no trade execution |
+| `family` | Mention-gated secure responder | Only responds when explicitly tagged |
+| `movie` | Watchlists & recommendations | Tracks preferences, finds showtimes |
+
 ## Operational Rhythm
 
 Every agent should follow this pattern:
@@ -14,8 +26,8 @@ Every agent should follow this pattern:
 2. **Every 10-15 min:** `clawctl checkin` via cron (heartbeat)
 3. **Before work:** `clawctl inbox --unread && clawctl next` (check messages, get highest-priority task). Use `clawctl list --mine` for a full queue view.
 4. **Claim work:** `clawctl claim <id>` then `clawctl start <id>`
-5. **During work:** `clawctl msg <agent> "update" --task <id>` (coordinate)
-6. **After work:** `clawctl done <id> -m "what I did" --meta '{"pr":42}'` then `clawctl next` for the next task. Use `--meta` to link PRs, reports, or other artifacts.
+5. **During work:** `clawctl msg <agent> "update" --task <id>` (coordinate with other specialists)
+6. **After work:** `clawctl done <id> -m "what I did" --meta '{"note":"~/notes/output.md"}'` then `clawctl next` for the next task. Use `--meta` to link notes, scripts, reports, or other artifacts.
 7. **History review:** `clawctl list --all` to see done/cancelled tasks (newest first)
 
 ## Decision Tree
@@ -24,11 +36,11 @@ Every agent should follow this pattern:
 |-----------|---------|
 | New idea/task | `clawctl add "Subject" -d "Details"` |
 | Want to work | `clawctl next` then `clawctl claim <id>` if unowned |
-| Stuck/blocked | `clawctl msg <lead> "Blocked on X" --task <id> --type question` |
+| Stuck/blocked | `clawctl msg chat "Blocked on X" --task <id> --type question` |
 | Finished | `clawctl done <id> -m "Result"` |
-| Need review | `clawctl msg <reviewer> "Ready" --task <id> --type handoff` |
+| Hand off to specialist | `clawctl msg notes "Research complete, ready to file" --task <id> --type handoff` |
 | Catching up | `clawctl feed --last 20` or `clawctl summary` |
-| Linking artifacts | Add `--meta '{"pr":42,"report":"path/to/file"}'` to `claim`, `start`, `done`, or `block` |
+| Linking artifacts | Add `--meta '{"note":"~/notes/file.md","script":"~/scripts/tool.py"}'` to `claim`, `start`, `done`, or `block` |
 
 ## Task Statuses
 

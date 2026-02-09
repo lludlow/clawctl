@@ -5,20 +5,21 @@ Coordination layer for [OpenClaw](https://github.com/openclaw/openclaw) agent fl
 ```
 $ clawctl board
 
-═══ CLAWCTL ═══  agent: coder
+═══ CLAWCTL ═══  agent: chat
 
 ── ○ pending (2) ──
-  #3 Write integration tests for auth endpoint
-  #4 Update API documentation for v2 routes
+  #4 Summarize weekly spending from transaction exports
+  #6 Find showtimes for new releases this weekend [movie]
 
-── ▶ in_progress (1) ──
-  #1 Implement user authentication endpoint [coder]
+── ▶ in_progress (2) ──
+  #1 Research best noise-cancelling headphones under $300 [research]
+  #5 Write a Python script to rename photos by EXIF date [coding]
 
 ── ✗ blocked (1) ──
-  #5 Deploy auth service to staging [deployer]
+  #3 File notes from the headphone research [notes]
 
 ── ✓ done (1) ──
-  #2 Set up database migrations for users table [coder]
+  #2 Check portfolio risk exposure for earnings week [trading]
 ```
 
 ## Why this exists
@@ -56,24 +57,28 @@ pip install -e .
 # Initialize
 clawctl init
 
-# Register your agents
-clawctl register coder --role "feature implementation & bug fixes"
-clawctl register reviewer --role "code review & quality checks"
-clawctl register deployer --role "CI/CD & infrastructure"
+# Register the fleet
+clawctl register chat --role "everyday triage & delegation"
+clawctl register research --role "deep reasoning & web search"
+clawctl register coding --role "sandboxed code execution"
+clawctl register notes --role "knowledge graph & note-taking"
+clawctl register trading --role "read-only market analysis"
+clawctl register family --role "mention-gated secure responder"
+clawctl register movie --role "watchlists & recommendations"
 
-# Create tasks
-clawctl add "Implement user authentication endpoint" --for coder
-clawctl add "Set up database migrations for users table" -p 1
-clawctl add "Write integration tests for auth" --parent 1
+# Chat agent delegates work to specialists
+CLAW_AGENT=chat clawctl add "Research best noise-cancelling headphones under $300" --for research
+CLAW_AGENT=chat clawctl add "Write a Python script to rename photos by EXIF date" --for coding -p 1
+CLAW_AGENT=chat clawctl add "File notes from the headphone research" --for notes
 
-# Agent workflow
-CLAW_AGENT=coder clawctl claim 1
-CLAW_AGENT=coder clawctl start 1
-CLAW_AGENT=coder clawctl done 1 -m "Auth endpoint complete, supports JWT" \
-  --meta '{"pr":"/pulls/42","branch":"feat/auth"}'
+# Research agent picks up its task
+CLAW_AGENT=research clawctl claim 1
+CLAW_AGENT=research clawctl start 1
+CLAW_AGENT=research clawctl done 1 -m "Top 3 picks with comparison table" \
+  --meta '{"note":"~/notes/headphone-research.md"}'
 
-# Coordinate
-CLAW_AGENT=coder clawctl msg reviewer "Auth PR is ready for review" --task 1
+# Research hands off to notes for filing
+CLAW_AGENT=research clawctl msg notes "Research complete, ready to file" --task 3
 
 # Monitor
 clawctl board
@@ -87,19 +92,21 @@ The typical agent loop:
 
 ```bash
 # On startup — check messages, find work
-CLAW_AGENT=researcher clawctl checkin
-CLAW_AGENT=researcher clawctl inbox --unread
-CLAW_AGENT=researcher clawctl next
+CLAW_AGENT=coding clawctl checkin
+CLAW_AGENT=coding clawctl inbox --unread
+CLAW_AGENT=coding clawctl next
 
 # Do the work, then close out
-CLAW_AGENT=researcher clawctl done <id> -m "Competitive analysis complete" \
-  --meta '{"report":"~/reports/competitive-analysis.md"}'
+CLAW_AGENT=coding clawctl done <id> -m "Script written and tested" \
+  --meta '{"script":"~/scripts/rename-photos.py","tests":"passed"}'
 ```
 
 Add a heartbeat to each agent's cron:
 
 ```
-*/10 * * * * CLAW_AGENT=researcher clawctl checkin
+*/10 * * * * CLAW_AGENT=chat clawctl checkin
+*/10 * * * * CLAW_AGENT=research clawctl checkin
+*/10 * * * * CLAW_AGENT=coding clawctl checkin
 ```
 
 Add to each agent's system prompt or AGENTS.md:
@@ -173,11 +180,11 @@ pending ─→ claimed ─→ in_progress ─→ done
 Mutating commands (`claim`, `start`, `done`, `block`) accept `--meta` with a JSON string stored in the activity log. Use it to link back to external artifacts:
 
 ```bash
-clawctl claim 1 --meta '{"source":"jira","ticket":"AUTH-142"}'
-clawctl done 1 -m "Implemented and tested" --meta '{"pr":42,"tests_passed":true}'
+clawctl claim 1 --meta '{"source":"whatsapp","channel":"general"}'
+clawctl done 1 -m "Top 3 picks with pros/cons" --meta '{"note":"~/notes/headphone-research.md"}'
 
 # Review what happened overnight
-clawctl feed --last 50 --agent coder --meta
+clawctl feed --last 50 --agent research --meta
 ```
 
 ## Web dashboard

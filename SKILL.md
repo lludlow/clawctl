@@ -12,17 +12,18 @@ Every agent should follow this pattern:
 
 1. **On startup:** `clawctl checkin` (registers presence)
 2. **Every 10-15 min:** `clawctl checkin` via cron (heartbeat)
-3. **Before work:** `clawctl inbox --unread` (check messages), `clawctl list --status pending` (find work)
+3. **Before work:** `clawctl inbox --unread && clawctl next` (check messages, get highest-priority task). Use `clawctl list --mine` for a full queue view.
 4. **Claim work:** `clawctl claim <id>` then `clawctl start <id>`
 5. **During work:** `clawctl msg <agent> "update" --task <id>` (coordinate)
-6. **After work:** `clawctl done <id> -m "what I did"` then check for next task
+6. **After work:** `clawctl done <id> -m "what I did"` then `clawctl next` for the next task
+7. **History review:** `clawctl list --all` to see done/cancelled tasks (newest first)
 
 ## Decision Tree
 
 | Situation | Command |
 |-----------|---------|
 | New idea/task | `clawctl add "Subject" -d "Details"` |
-| Want to work | `clawctl list --status pending` then `clawctl claim <id>` |
+| Want to work | `clawctl next` then `clawctl claim <id>` if unowned |
 | Stuck/blocked | `clawctl msg <lead> "Blocked on X" --task <id> --type question` |
 | Finished | `clawctl done <id> -m "Result"` |
 | Need review | `clawctl msg <reviewer> "Ready" --task <id> --type handoff` |
@@ -31,8 +32,8 @@ Every agent should follow this pattern:
 ## Task Statuses
 
 ```
-pending → claimed → in_progress → review → done
-                  ↘ blocked ↗         ↘ cancelled
+pending → claimed → in_progress → done
+                  ↘ blocked ↗    ↘ cancelled
 ```
 
 ## CLI Reference
@@ -40,10 +41,11 @@ pending → claimed → in_progress → review → done
 ### Tasks
 ```
 clawctl add "Subject" [-d "description"] [-p 0|1|2] [--for agent] [--parent id]
-clawctl list [--status STATUS] [--owner AGENT] [--mine]
+clawctl list [--status STATUS] [--owner AGENT] [--mine] [--all]
+clawctl next
 clawctl claim <id> [--force]
 clawctl start <id>
-clawctl done <id> [-m "note"]
+clawctl done <id> [-m "note"] [--force]
 clawctl block <id> --by <other-id>
 clawctl board
 ```

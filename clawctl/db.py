@@ -10,9 +10,9 @@ import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 
-DB_PATH = os.environ.get('CLAW_DB', os.path.expanduser('~/.openclaw/clawctl.db'))
-AGENT_EXPLICIT = 'CLAW_AGENT' in os.environ
-AGENT = os.environ.get('CLAW_AGENT', os.getenv('USER', 'unknown'))
+DB_PATH = os.environ.get("CLAW_DB", os.path.expanduser("~/.openclaw/clawctl.db"))
+AGENT_EXPLICIT = "CLAW_AGENT" in os.environ
+AGENT = os.environ.get("CLAW_AGENT", os.getenv("USER", "unknown"))
 
 
 @contextmanager
@@ -34,7 +34,7 @@ def get_db():
 def init_db():
     Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
-    schema_path = Path(__file__).parent / 'schema.sql'
+    schema_path = Path(__file__).parent / "schema.sql"
     conn.executescript(schema_path.read_text())
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
@@ -49,6 +49,7 @@ def log_activity(conn, agent, action, target_type, target_id, detail="", meta=No
 
 
 # ── Agents ──────────────────────────────────────────────
+
 
 def register_agent(conn, name, role=""):
     conn.execute(
@@ -89,7 +90,10 @@ def get_agent_info(conn, agent):
 
 # ── Tasks ───────────────────────────────────────────────
 
-def add_task(conn, subject, desc="", priority=0, assignee="", created_by="", parent_id=None):
+
+def add_task(
+    conn, subject, desc="", priority=0, assignee="", created_by="", parent_id=None
+):
     status = "claimed" if assignee else "pending"
     claimed_at = "datetime('now')" if assignee else None
 
@@ -209,15 +213,34 @@ def start_task(conn, task_id, agent, meta=None):
     return True, None
 
 
-def complete_task(conn, task_id, agent, note="", meta=None):
-    cur = conn.execute(
-        """UPDATE tasks SET status='done', completed_at=datetime('now'),
-            updated_at=datetime('now')
-        WHERE id=? AND status != 'done'""",
-        (task_id,),
-    )
+def complete_task(conn, task_id, agent, note="", meta=None, force=False):
+    if force:
+        cur = conn.execute(
+            """UPDATE tasks SET status='done', completed_at=datetime('now'),
+                updated_at=datetime('now')
+            WHERE id=? AND status != 'done'""",
+            (task_id,),
+        )
+    else:
+        cur = conn.execute(
+            """UPDATE tasks SET status='done', completed_at=datetime('now'),
+                updated_at=datetime('now')
+            WHERE id=? AND owner=? AND status != 'done'""",
+            (task_id, agent),
+        )
     if cur.rowcount == 0:
-        return True, "already done"
+        row = conn.execute(
+            "SELECT id, owner, status FROM tasks WHERE id=?", (task_id,)
+        ).fetchone()
+        if not row:
+            return False, "not found"
+        if row["status"] == "done":
+            return True, "already done"
+        if row["owner"] != agent:
+            return (
+                False,
+                f"not owned by you (owner: {row['owner'] or 'unassigned'}). Use --force to override",
+            )
     conn.execute("UPDATE agents SET status='idle' WHERE name=?", (agent,))
     log_activity(conn, agent, "task_completed", "task", task_id, note, meta=meta)
     if note:
@@ -253,7 +276,15 @@ def block_task(conn, task_id, blocked_by_id, meta=None):
             "UPDATE tasks SET status='blocked', updated_at=datetime('now') WHERE id=?",
             (task_id,),
         )
-        log_activity(conn, AGENT, "task_blocked", "task", task_id, f"by #{blocked_by_id}", meta=meta)
+        log_activity(
+            conn,
+            AGENT,
+            "task_blocked",
+            "task",
+            task_id,
+            f"by #{blocked_by_id}",
+            meta=meta,
+        )
         return True, None
     except sqlite3.IntegrityError:
         return False, "dependency already exists"
@@ -287,12 +318,15 @@ def get_board(conn):
 
 # ── Messages ────────────────────────────────────────────
 
+
 def send_message(conn, from_agent, to_agent, body, task_id=None, msg_type="comment"):
     conn.execute(
         "INSERT INTO messages(from_agent,to_agent,task_id,body,msg_type) VALUES(?,?,?,?,?)",
         (from_agent, to_agent, task_id, body, msg_type),
     )
-    log_activity(conn, from_agent, "message_sent", "message", 0, f"to:{to_agent} type:{msg_type}")
+    log_activity(
+        conn, from_agent, "message_sent", "message", 0, f"to:{to_agent} type:{msg_type}"
+    )
     return True, None
 
 
@@ -329,6 +363,7 @@ def mark_messages_read(conn, agent):
 
 # ── Fleet ───────────────────────────────────────────────
 
+
 def get_fleet(conn):
     rows = conn.execute(
         """SELECT name, role,
@@ -341,6 +376,7 @@ def get_fleet(conn):
 
 
 # ── Feed ────────────────────────────────────────────────
+
 
 def get_feed(conn, limit=20, agent_filter=None):
     where = "1=1"
@@ -358,9 +394,7 @@ def get_feed(conn, limit=20, agent_filter=None):
 
 
 def get_summary(conn):
-    agents = conn.execute(
-        "SELECT name, status, role FROM agents"
-    ).fetchall()
+    agents = conn.execute("SELECT name, status, role FROM agents").fetchall()
     open_count = conn.execute(
         "SELECT COUNT(*) AS cnt FROM tasks WHERE status NOT IN ('done','cancelled')"
     ).fetchone()["cnt"]
@@ -384,6 +418,7 @@ def get_summary(conn):
 
 
 # ── API helpers (for Flask) ─────────────────────────────
+
 
 def get_board_api(conn):
     tasks = conn.execute(

@@ -13,12 +13,12 @@ import click
 from clawctl import db
 
 # ANSI colors
-R = '\033[0;31m'
-G = '\033[0;32m'
-Y = '\033[1;33m'
-C = '\033[0;36m'
-B = '\033[1m'
-N = '\033[0m'
+R = "\033[0;31m"
+G = "\033[0;32m"
+Y = "\033[1;33m"
+C = "\033[0;36m"
+B = "\033[1m"
+N = "\033[0m"
 
 _agent_warned = False
 
@@ -27,14 +27,16 @@ def _warn_agent_fallback():
     """Warn once if CLAW_AGENT wasn't explicitly set."""
     global _agent_warned
     if not db.AGENT_EXPLICIT and not _agent_warned:
-        click.echo(f"{Y}Note: CLAW_AGENT not set, using $USER ({db.AGENT}){N}", err=True)
+        click.echo(
+            f"{Y}Note: CLAW_AGENT not set, using $USER ({db.AGENT}){N}", err=True
+        )
         _agent_warned = True
 
 
 def _char_width(ch):
     """Return display width of a character (2 for wide/fullwidth, 1 otherwise)."""
     w = unicodedata.east_asian_width(ch)
-    return 2 if w in ('F', 'W') else 1
+    return 2 if w in ("F", "W") else 1
 
 
 def _str_width(s):
@@ -51,8 +53,10 @@ def print_columnar(rows, columns):
     # Calculate widths
     widths = {}
     for header, key in columns:
-        vals = [str(v) if (v := d.get(key)) is not None else '' for d in data]
-        widths[key] = max(_str_width(header), max((_str_width(v) for v in vals), default=0))
+        vals = [str(v) if (v := d.get(key)) is not None else "" for d in data]
+        widths[key] = max(
+            _str_width(header), max((_str_width(v) for v in vals), default=0)
+        )
     # Print header
     hdr = "  ".join(h.ljust(widths[k]) for h, k in columns)
     click.echo(hdr)
@@ -61,7 +65,7 @@ def print_columnar(rows, columns):
     for d in data:
         parts = []
         for _, k in columns:
-            val = str(v) if (v := d.get(k)) is not None else ''
+            val = str(v) if (v := d.get(k)) is not None else ""
             pad = widths[k] - _str_width(val)
             parts.append(val + " " * pad)
         click.echo("  ".join(parts))
@@ -74,7 +78,7 @@ def cli(ctx):
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
         return
-    if ctx.invoked_subcommand not in ('init', 'help'):
+    if ctx.invoked_subcommand not in ("init", "help"):
         if not os.path.exists(db.DB_PATH):
             click.echo(f"{Y}No database found. Run: clawctl init{N}", err=True)
             ctx.exit(1)
@@ -88,8 +92,8 @@ def init():
 
 
 @cli.command()
-@click.argument('name')
-@click.option('--role', default='', help='Agent role')
+@click.argument("name")
+@click.option("--role", default="", help="Agent role")
 def register(name, role):
     """Register an agent"""
     with db.get_db() as conn:
@@ -112,45 +116,54 @@ def checkin():
 
 
 @cli.command()
-@click.argument('subject')
-@click.option('-d', '--desc', default='', help='Description')
-@click.option('-p', '--priority', type=int, default=0, help='Priority (0, 1, 2)')
-@click.option('--for', 'assignee', default='', help='Assign to agent')
-@click.option('--parent', type=int, default=None, help='Parent task ID')
+@click.argument("subject")
+@click.option("-d", "--desc", default="", help="Description")
+@click.option("-p", "--priority", type=int, default=0, help="Priority (0, 1, 2)")
+@click.option("--for", "assignee", default="", help="Assign to agent")
+@click.option("--parent", type=int, default=None, help="Parent task ID")
 def add(subject, desc, priority, assignee, parent):
     """Create a task"""
     with db.get_db() as conn:
-        ok, task_id = db.add_task(conn, subject, desc, priority, assignee, db.AGENT, parent)
+        ok, task_id = db.add_task(
+            conn, subject, desc, priority, assignee, db.AGENT, parent
+        )
     click.echo(f"{G}#{task_id}{N} {subject}{f' → {assignee}' if assignee else ''}")
 
 
-@cli.command('list')
-@click.option('--status', default=None, help='Filter by status')
-@click.option('--owner', default=None, help='Filter by owner')
-@click.option('--mine', is_flag=True, help='Show only my tasks')
-@click.option('--all', 'include_all', is_flag=True, help='Include done/cancelled')
+@cli.command("list")
+@click.option("--status", default=None, help="Filter by status")
+@click.option("--owner", default=None, help="Filter by owner")
+@click.option("--mine", is_flag=True, help="Show only my tasks")
+@click.option("--all", "include_all", is_flag=True, help="Include done/cancelled")
 def list_cmd(status, owner, mine, include_all):
     """List tasks (excludes done/cancelled by default)"""
     if mine:
         _warn_agent_fallback()
     with db.get_db() as conn:
-        rows = db.list_tasks(conn, status, owner, db.AGENT if mine else None, include_all)
+        rows = db.list_tasks(
+            conn, status, owner, db.AGENT if mine else None, include_all
+        )
     if not rows:
         click.echo("No tasks found.")
         return
-    print_columnar(rows, [
-        ("ID", "id"),
-        ("Subject", "subject"),
-        ("Status", "icon"),
-        ("Owner", "owner"),
-        ("Pri", "pri"),
-    ])
+    print_columnar(
+        rows,
+        [
+            ("ID", "id"),
+            ("Subject", "subject"),
+            ("Status", "icon"),
+            ("Owner", "owner"),
+            ("Pri", "pri"),
+        ],
+    )
     scope = "mine" if mine else "all agents"
     if not include_all and not status:
-        click.echo(f"\n{len(rows)} active ({scope}). Use --all to include done/cancelled.")
+        click.echo(
+            f"\n{len(rows)} active ({scope}). Use --all to include done/cancelled."
+        )
 
 
-@cli.command('next')
+@cli.command("next")
 def next_cmd():
     """Show the next task to work on (highest priority, actionable)"""
     _warn_agent_fallback()
@@ -161,13 +174,15 @@ def next_cmd():
         click.echo("No actionable tasks.")
         return
     pri = "!!!" if row["priority"] == 2 else "!" if row["priority"] == 1 else ""
-    click.echo(f"#{row['id']} {row['subject']} [{row['status']}]{f' {pri}' if pri else ''}")
+    click.echo(
+        f"#{row['id']} {row['subject']} [{row['status']}]{f' {pri}' if pri else ''}"
+    )
 
 
 @cli.command()
-@click.argument('id', type=int)
-@click.option('--force', is_flag=True, help='Force claim even if owned by another')
-@click.option('--meta', default=None, help='JSON metadata blob for activity log')
+@click.argument("id", type=int)
+@click.option("--force", is_flag=True, help="Force claim even if owned by another")
+@click.option("--meta", default=None, help="JSON metadata blob for activity log")
 def claim(id, force, meta):
     """Claim a task"""
     _warn_agent_fallback()
@@ -182,8 +197,8 @@ def claim(id, force, meta):
 
 
 @cli.command()
-@click.argument('id', type=int)
-@click.option('--meta', default=None, help='JSON metadata blob for activity log')
+@click.argument("id", type=int)
+@click.option("--meta", default=None, help="JSON metadata blob for activity log")
 def start(id, meta):
     """Begin work on a task"""
     _warn_agent_fallback()
@@ -198,15 +213,19 @@ def start(id, meta):
 
 
 @cli.command()
-@click.argument('id', type=int)
-@click.option('-m', '--message', 'note', default='', help='Completion note')
-@click.option('--meta', default=None, help='JSON metadata blob for activity log')
-def done(id, note, meta):
+@click.argument("id", type=int)
+@click.option("-m", "--message", "note", default="", help="Completion note")
+@click.option("--force", is_flag=True, help="Complete even if not the owner")
+@click.option("--meta", default=None, help="JSON metadata blob for activity log")
+def done(id, note, force, meta):
     """Complete a task"""
     _warn_agent_fallback()
     agent = db.AGENT
     with db.get_db() as conn:
-        ok, info = db.complete_task(conn, id, agent, note, meta=meta)
+        ok, info = db.complete_task(conn, id, agent, note, meta=meta, force=force)
+    if not ok:
+        click.echo(f"{R}{info}{N}", err=True)
+        sys.exit(1)
     if info == "already done":
         click.echo(f"{Y}#{id} already done{N}")
     else:
@@ -217,9 +236,9 @@ def done(id, note, meta):
 
 
 @cli.command()
-@click.argument('id', type=int)
-@click.option('--by', 'blocked_by', type=int, required=True, help='Blocking task ID')
-@click.option('--meta', default=None, help='JSON metadata blob for activity log')
+@click.argument("id", type=int)
+@click.option("--by", "blocked_by", type=int, required=True, help="Blocking task ID")
+@click.option("--meta", default=None, help="JSON metadata blob for activity log")
 def block(id, blocked_by, meta):
     """Mark a task as blocked by another task"""
     with db.get_db() as conn:
@@ -238,8 +257,12 @@ def board():
     click.echo(f"{B}═══ CLAWCTL ═══{N}  agent: {C}{agent}{N}")
     click.echo()
     icons = {
-        "pending": "○", "claimed": "◉", "in_progress": "▶",
-        "review": "⟳", "blocked": "✗", "done": "✓",
+        "pending": "○",
+        "claimed": "◉",
+        "in_progress": "▶",
+        "review": "⟳",
+        "blocked": "✗",
+        "done": "✓",
     }
     with db.get_db() as conn:
         board_data = db.get_board(conn)
@@ -256,10 +279,10 @@ def board():
 
 
 @cli.command()
-@click.argument('to')
-@click.argument('body')
-@click.option('--task', 'task_id', type=int, default=None, help='Related task ID')
-@click.option('--type', 'msg_type', default='comment', help='Message type')
+@click.argument("to")
+@click.argument("body")
+@click.option("--task", "task_id", type=int, default=None, help="Related task ID")
+@click.option("--type", "msg_type", default="comment", help="Message type")
 def msg(to, body, task_id, msg_type):
     """Send a message to an agent"""
     with db.get_db() as conn:
@@ -268,7 +291,7 @@ def msg(to, body, task_id, msg_type):
 
 
 @cli.command()
-@click.argument('body')
+@click.argument("body")
 def broadcast(body):
     """Broadcast a message to all agents"""
     with db.get_db() as conn:
@@ -277,7 +300,7 @@ def broadcast(body):
 
 
 @cli.command()
-@click.option('--unread', is_flag=True, help='Show only unread messages')
+@click.option("--unread", is_flag=True, help="Show only unread messages")
 def inbox(unread):
     """Read messages"""
     agent = db.AGENT
@@ -287,14 +310,17 @@ def inbox(unread):
     if not rows:
         click.echo("No messages.")
         return
-    print_columnar(rows, [
-        ("ID", "id"),
-        ("From", "from_agent"),
-        ("Body", "body"),
-        ("Type", "msg_type"),
-        ("New", "new"),
-        ("At", "at"),
-    ])
+    print_columnar(
+        rows,
+        [
+            ("ID", "id"),
+            ("From", "from_agent"),
+            ("Body", "body"),
+            ("Type", "msg_type"),
+            ("New", "new"),
+            ("At", "at"),
+        ],
+    )
 
 
 @cli.command()
@@ -306,19 +332,22 @@ def fleet():
     if not rows:
         click.echo("No agents registered.")
         return
-    print_columnar(rows, [
-        ("Name", "name"),
-        ("Role", "role"),
-        ("Status", "status"),
-        ("Working On", "working_on"),
-        ("Last Seen", "last_seen"),
-    ])
+    print_columnar(
+        rows,
+        [
+            ("Name", "name"),
+            ("Role", "role"),
+            ("Status", "status"),
+            ("Working On", "working_on"),
+            ("Last Seen", "last_seen"),
+        ],
+    )
 
 
 @cli.command()
-@click.option('--last', 'limit', type=int, default=20, help='Number of entries')
-@click.option('--agent', 'agent_filter', default=None, help='Filter by agent')
-@click.option('--meta', 'show_meta', is_flag=True, help='Show metadata column')
+@click.option("--last", "limit", type=int, default=20, help="Number of entries")
+@click.option("--agent", "agent_filter", default=None, help="Filter by agent")
+@click.option("--meta", "show_meta", is_flag=True, help="Show metadata column")
 def feed(limit, agent_filter, show_meta):
     """Activity log"""
     with db.get_db() as conn:
@@ -371,11 +400,14 @@ def whoami():
 
 
 @cli.command()
-@click.option('--port', default=3737, help='Port to run on')
-@click.option('--stop', is_flag=True, help='Stop the running dashboard')
-def dashboard(port, stop):
+@click.option("--port", default=3737, help="Port to run on")
+@click.option("--stop", is_flag=True, help="Stop the running dashboard")
+@click.option(
+    "--verbose", is_flag=True, help="Log dashboard output to ~/.openclaw/dashboard.log"
+)
+def dashboard(port, stop, verbose):
     """Start (or stop) the web dashboard"""
-    pid_file = Path(db.DB_PATH).parent / '.dashboard.pid'
+    pid_file = Path(db.DB_PATH).parent / ".dashboard.pid"
 
     if stop:
         if not pid_file.exists():
@@ -395,6 +427,7 @@ def dashboard(port, stop):
         try:
             os.kill(pid, 0)
             from dashboard.server import load_or_create_token
+
             token = load_or_create_token()
             click.echo(f"{Y}Dashboard already running{N} (pid {pid})")
             click.echo(f"\n  {C}http://localhost:{port}/?token={token}{N}\n")
@@ -403,23 +436,38 @@ def dashboard(port, stop):
             pid_file.unlink(missing_ok=True)
 
     # Ensure token exists before starting (server creates it on import)
-    token_path = Path(db.DB_PATH).parent / '.clawctl-token'
     from dashboard.server import load_or_create_token
+
     token = load_or_create_token()
 
+    if verbose:
+        log_path = Path(db.DB_PATH).parent / "dashboard.log"
+        log_file = open(log_path, "a")
+        stdout_target = log_file
+        stderr_target = log_file
+    else:
+        log_file = None
+        stdout_target = subprocess.DEVNULL
+        stderr_target = subprocess.DEVNULL
+
     proc = subprocess.Popen(
-        [sys.executable, '-m', 'dashboard', '--port', str(port)],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        [sys.executable, "-m", "dashboard", "--port", str(port)],
+        stdout=stdout_target,
+        stderr=stderr_target,
         start_new_session=True,
     )
+    if log_file:
+        log_file.close()
+
     pid_file.write_text(str(proc.pid))
     click.echo(f"{G}Dashboard started{N} on port {port} (pid {proc.pid})")
     click.echo(f"\n  {C}http://localhost:{port}/?token={token}{N}\n")
+    if verbose:
+        click.echo(f"Logging to: {log_path}")
     click.echo(f"Stop with: clawctl dashboard --stop")
 
 
-@cli.command('help')
+@cli.command("help")
 @click.pass_context
 def help_cmd(ctx):
     """Show help"""

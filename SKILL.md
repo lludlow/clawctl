@@ -1,46 +1,50 @@
-# clawctl
+---
+name: clawctl
+description: Coordinate multi-agent fleets with a shared task board, messaging, and activity feed via CLI. Use when agents need to create tasks, claim work, communicate with other agents, track progress, or review fleet status.
+license: MIT
+compatibility: Requires Python >=3.9 and the clawctl package installed. Uses SQLite (WAL mode) for storage.
+metadata:
+  author: lludlow
+  version: "0.2.0"
+---
 
-Shared coordination layer for OpenClaw agent fleets. Provides a task board, inter-agent messaging, and activity feed via a single CLI.
+# clawctl — Agent Coordination
+
+Shared coordination layer for OpenClaw agent fleets. All agents read and write to a single SQLite database via CLI commands.
 
 ## Setup
 
-Run `clawctl init` to create the database. Set your identity: `export CLAW_AGENT=your-name`
+```bash
+clawctl init                        # create the database
+export CLAW_AGENT=your-name         # set your identity
+export CLAW_DB=~/.openclaw/clawctl.db  # optional, this is the default
+```
 
-## Fleet Roster (example)
-
-| Agent | Role | Notes |
-|-------|------|-------|
-| `chat` | Everyday triage & delegation | Handles most messages, delegates complex work to specialists |
-| `research` | Deep reasoning & web search | Long-form analysis, comparisons, recommendations |
-| `coding` | Sandboxed code execution | Writes and tests scripts/tools in isolation |
-| `notes` | Knowledge graph & note-taking | Files research, maintains Obsidian-style workspace |
-| `trading` | Read-only market analysis | Market commentary only — no trade execution |
-| `family` | Mention-gated secure responder | Only responds when explicitly tagged |
-| `movie` | Watchlists & recommendations | Tracks preferences, finds showtimes |
+If `CLAW_AGENT` is not set, clawctl falls back to `$USER` with a warning.
 
 ## Operational Rhythm
 
-Every agent should follow this pattern:
+Follow this pattern every session:
 
-1. **On startup:** `clawctl checkin` (registers presence)
-2. **Every 10-15 min:** `clawctl checkin` via cron (heartbeat)
-3. **Before work:** `clawctl inbox --unread && clawctl next` (check messages, get highest-priority task). Use `clawctl list --mine` for a full queue view.
-4. **Claim work:** `clawctl claim <id>` then `clawctl start <id>`
-5. **During work:** `clawctl msg <agent> "update" --task <id>` (coordinate with other specialists)
-6. **After work:** `clawctl done <id> -m "what I did" --meta '{"note":"~/notes/output.md"}'` then `clawctl next` for the next task. Use `--meta` to link notes, scripts, reports, or other artifacts.
-7. **History review:** `clawctl list --all` to see done/cancelled tasks (newest first)
+1. **Check in:** `clawctl checkin` (registers presence, shows unread count)
+2. **Read messages:** `clawctl inbox --unread`
+3. **Find work:** `clawctl next` (highest-priority actionable task) or `clawctl list --mine`
+4. **Claim and start:** `clawctl claim <id>` then `clawctl start <id>`
+5. **Coordinate:** `clawctl msg <agent> "update" --task <id>` during work
+6. **Complete:** `clawctl done <id> -m "what I did"` then `clawctl next`
 
 ## Decision Tree
 
 | Situation | Command |
 |-----------|---------|
-| New idea/task | `clawctl add "Subject" -d "Details"` |
-| Want to work | `clawctl next` then `clawctl claim <id>` if unowned |
-| Stuck/blocked | `clawctl msg chat "Blocked on X" --task <id> --type question` |
+| New task | `clawctl add "Subject" -d "Details"` |
+| Find work | `clawctl next` then `clawctl claim <id>` |
+| Blocked | `clawctl block <id> --by <blocker-id>` and `clawctl msg <agent> "Blocked on X" --task <id> --type question` |
 | Finished | `clawctl done <id> -m "Result"` |
-| Hand off to specialist | `clawctl msg notes "Research complete, ready to file" --task <id> --type handoff` |
-| Catching up | `clawctl feed --last 20` or `clawctl summary` |
-| Linking artifacts | Add `--meta '{"note":"~/notes/file.md","script":"~/scripts/tool.py"}'` to `claim`, `start`, `done`, or `block` |
+| Hand off | `clawctl msg <agent> "Ready for you" --task <id> --type handoff` |
+| Ready for review | `clawctl review <id>` |
+| Catch up | `clawctl feed --last 20` or `clawctl summary` |
+| Link artifacts | Add `--meta '{"note":"path/to/file"}'` to `done`, `claim`, `start`, or `block` |
 
 ## Task Statuses
 
@@ -50,39 +54,56 @@ pending → claimed → in_progress → done
                   ↘ review  ↗
 ```
 
-## CLI Reference
+`list` excludes done/cancelled by default and sorts by status priority. Use `--all` for history.
+
+## Commands
 
 ### Tasks
-```
-clawctl add "Subject" [-d "description"] [-p 0|1|2] [--for agent] [--parent id]
-clawctl list [--status STATUS] [--owner AGENT] [--mine] [--all]
-clawctl next
-clawctl claim <id> [--force] [--meta JSON]
-clawctl start <id> [--meta JSON]
-clawctl done <id> [-m "note"] [--force] [--meta JSON]
-clawctl review <id> [--meta JSON]
-clawctl cancel <id> [--meta JSON]
-clawctl block <id> --by <other-id> [--meta JSON]
-clawctl board
-```
+
+| Command | Description |
+|---------|-------------|
+| `add SUBJECT` | Create a task. `-d` description, `-p 0\|1\|2` priority, `--for AGENT` assign, `--parent ID` subtask |
+| `list` | Active tasks. `--mine`, `--status STATUS`, `--owner AGENT`, `--all` |
+| `next` | Highest-priority actionable task for current agent |
+| `claim ID` | Claim a task. `--force` to override, `--meta JSON` |
+| `start ID` | Begin work (in_progress). `--meta JSON` |
+| `done ID` | Complete. `-m` note, `--force`, `--meta JSON` |
+| `review ID` | Mark ready for review. `--meta JSON` |
+| `cancel ID` | Cancel a task. `--meta JSON` |
+| `block ID --by OTHER` | Mark blocked by another task. `--meta JSON` |
+| `board` | Kanban board grouped by status |
 
 ### Messages
-```
-clawctl msg <agent> "body" [--task <id>] [--type TYPE]
-clawctl broadcast "body"
-clawctl inbox [--unread]
-```
+
+| Command | Description |
+|---------|-------------|
+| `msg AGENT BODY` | Send message. `--task ID`, `--type TYPE` (comment, status, handoff, question, answer, alert) |
+| `broadcast BODY` | Alert all agents |
+| `inbox` | Read messages. `--unread` for unread only |
 
 ### Fleet
-```
-clawctl checkin
-clawctl register <name> [--role role]
-clawctl fleet
-clawctl whoami
-```
 
-### Feed
-```
-clawctl feed [--last N] [--agent NAME] [--meta]
-clawctl summary
-```
+| Command | Description |
+|---------|-------------|
+| `checkin` | Heartbeat — update presence, report unread count |
+| `register NAME` | Register agent. `--role TEXT` |
+| `fleet` | All agents with status and current task |
+| `whoami` | Identity, role, and DB path |
+
+### Monitoring
+
+| Command | Description |
+|---------|-------------|
+| `feed` | Activity log. `--last N`, `--agent NAME`, `--meta` |
+| `summary` | Fleet overview with counts and recent events |
+| `dashboard` | Web UI. `--port INT`, `--stop`, `--verbose` |
+
+## Important Conventions
+
+- Always `checkin` at session start.
+- Always check `inbox --unread` before picking up work.
+- Use `next` to find work rather than scanning the full list.
+- Only claim tasks assigned to you or matching your role.
+- Use `--meta` to link artifacts (notes, scripts, reports) in the activity log.
+- Completing an already-done task is a safe no-op (idempotent).
+- Force-claiming (`--force`) overrides another agent's ownership — use sparingly.

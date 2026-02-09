@@ -131,6 +131,8 @@ Only claim tasks assigned to you or matching your role.
 | `claim ID` | Claim a task. Options: `--force` to override, `--meta JSON` |
 | `start ID` | Begin work (transitions to in_progress). Options: `--meta JSON` |
 | `done ID` | Complete a task. Options: `-m` note, `--force`, `--meta JSON` |
+| `review ID` | Mark task as ready for review. Options: `--meta JSON` |
+| `cancel ID` | Cancel a task. Options: `--meta JSON` |
 | `block ID --by OTHER` | Mark task as blocked. Options: `--meta JSON` |
 | `board` | Kanban board view grouped by status |
 

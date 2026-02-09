@@ -266,6 +266,20 @@ def cancel_task(conn, task_id, agent, meta=None):
     return True, None
 
 
+def review_task(conn, task_id, agent, meta=None):
+    cur = conn.execute(
+        "UPDATE tasks SET status='review', updated_at=datetime('now') WHERE id=? AND owner=?",
+        (task_id, agent),
+    )
+    if cur.rowcount == 0:
+        row = conn.execute("SELECT owner FROM tasks WHERE id=?", (task_id,)).fetchone()
+        if not row:
+            return False, "not found"
+        return False, f"not owned by you (owner: {row['owner']})"
+    log_activity(conn, agent, "task_review", "task", task_id, meta=meta)
+    return True, None
+
+
 def block_task(conn, task_id, blocked_by_id, meta=None):
     try:
         conn.execute(
@@ -354,11 +368,18 @@ def get_inbox(conn, agent, unread_only=False):
     return rows
 
 
-def mark_messages_read(conn, agent):
-    conn.execute(
-        "UPDATE messages SET read_at=datetime('now') WHERE to_agent=? AND read_at IS NULL",
-        (agent,),
-    )
+def mark_messages_read(conn, agent, message_ids=None):
+    if message_ids:
+        placeholders = ",".join("?" for _ in message_ids)
+        conn.execute(
+            f"UPDATE messages SET read_at=datetime('now') WHERE id IN ({placeholders}) AND read_at IS NULL",
+            message_ids,
+        )
+    else:
+        conn.execute(
+            "UPDATE messages SET read_at=datetime('now') WHERE to_agent=? AND read_at IS NULL",
+            (agent,),
+        )
 
 
 # ── Fleet ───────────────────────────────────────────────

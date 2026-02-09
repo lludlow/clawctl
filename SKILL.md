@@ -6,7 +6,7 @@ Shared coordination layer for OpenClaw agent fleets. Provides a task board, inte
 
 Run `clawctl init` to create the database. Set your identity: `export CLAW_AGENT=your-name`
 
-## Fleet Roster
+## Fleet Roster (example)
 
 | Agent | Role | Notes |
 |-------|------|-------|
@@ -60,6 +60,8 @@ clawctl next
 clawctl claim <id> [--force] [--meta JSON]
 clawctl start <id> [--meta JSON]
 clawctl done <id> [-m "note"] [--force] [--meta JSON]
+clawctl review <id> [--meta JSON]
+clawctl cancel <id> [--meta JSON]
 clawctl block <id> --by <other-id> [--meta JSON]
 clawctl board
 ```

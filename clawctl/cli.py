@@ -237,6 +237,40 @@ def done(id, note, force, meta):
 
 @cli.command()
 @click.argument("id", type=int)
+@click.option("--meta", default=None, help="JSON metadata blob for activity log")
+def review(id, meta):
+    """Mark a task as ready for review"""
+    _warn_agent_fallback()
+    agent = db.AGENT
+    with db.get_db() as conn:
+        ok, err = db.review_task(conn, id, agent, meta=meta)
+    if ok:
+        click.echo(f"{C}⟳ #{id} ready for review{N}")
+    else:
+        click.echo(f"{R}{err}{N}", err=True)
+        sys.exit(1)
+
+
+@cli.command()
+@click.argument("id", type=int)
+@click.option("--meta", default=None, help="JSON metadata blob for activity log")
+def cancel(id, meta):
+    """Cancel a task"""
+    _warn_agent_fallback()
+    agent = db.AGENT
+    with db.get_db() as conn:
+        ok, info = db.cancel_task(conn, id, agent, meta=meta)
+    if not ok:
+        click.echo(f"{R}{info}{N}", err=True)
+        sys.exit(1)
+    if info and info.startswith("already"):
+        click.echo(f"{Y}#{id} {info}{N}")
+    else:
+        click.echo(f"{Y}✗ Cancelled #{id}{N}")
+
+
+@cli.command()
+@click.argument("id", type=int)
 @click.option("--by", "blocked_by", type=int, required=True, help="Blocking task ID")
 @click.option("--meta", default=None, help="JSON metadata blob for activity log")
 def block(id, blocked_by, meta):
@@ -306,7 +340,9 @@ def inbox(unread):
     agent = db.AGENT
     with db.get_db() as conn:
         rows = db.get_inbox(conn, agent, unread)
-        db.mark_messages_read(conn, agent)
+        if rows:
+            displayed_ids = [row["id"] for row in rows]
+            db.mark_messages_read(conn, agent, displayed_ids)
     if not rows:
         click.echo("No messages.")
         return

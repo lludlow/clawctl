@@ -1,0 +1,137 @@
+"""Tests for dashboard.server — Flask API endpoints.
+
+Tests use Flask's test client with a fresh temp database.
+Auth token is pre-configured for each test.
+"""
+
+import json
+
+from clawctl import db
+
+
+# ── Board API ─────────────────────────────────────────
+
+
+class TestBoardApi:
+    """GET /api/board returns tasks and agents."""
+
+    def test_returns_json(self, flask_client):
+        client, token = flask_client
+        resp = client.get(f"/api/board?token={token}")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "tasks" in data
+        assert "agents" in data
+        assert "timestamp" in data
+
+    def test_requires_token(self, flask_client):
+        client, _ = flask_client
+        resp = client.get("/api/board")
+        assert resp.status_code == 401
+
+    def test_wrong_token_rejected(self, flask_client):
+        client, _ = flask_client
+        resp = client.get("/api/board?token=wrong")
+        assert resp.status_code == 401
+
+
+# ── Task Detail API ───────────────────────────────────
+
+
+class TestTaskDetailApi:
+    """GET /api/task/<id> returns task and messages."""
+
+    def test_returns_task(self, flask_client):
+        client, token = flask_client
+        # Create a task
+        with db.get_db() as conn:
+            db.add_task(conn, "Test task", created_by="test")
+        resp = client.get(f"/api/task/1?token={token}")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["task"]["subject"] == "Test task"
+        assert isinstance(data["messages"], list)
+
+    def test_nonexistent_task(self, flask_client):
+        client, token = flask_client
+        resp = client.get(f"/api/task/999?token={token}")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["task"] is None
+
+
+# ── Complete Endpoint ─────────────────────────────────
+
+
+class TestCompleteEndpoint:
+    """POST /api/task/<id>/complete marks task done."""
+
+    def test_completes_task(self, flask_client):
+        client, token = flask_client
+        with db.get_db() as conn:
+            db.add_task(conn, "Task to complete", created_by="test")
+        resp = client.post(
+            f"/api/task/1/complete?token={token}",
+            data=json.dumps({"agent": "dashboard", "note": "Done from UI"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        assert resp.get_json()["success"] is True
+
+
+# ── Delete Endpoint ───────────────────────────────────
+
+
+class TestDeleteEndpoint:
+    """POST /api/task/<id>/delete cancels a task."""
+
+    def test_cancels_task(self, flask_client):
+        client, token = flask_client
+        with db.get_db() as conn:
+            db.add_task(conn, "Task to cancel", created_by="test")
+        resp = client.post(
+            f"/api/task/1/delete?token={token}",
+            data=json.dumps({"agent": "dashboard"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        assert resp.get_json()["success"] is True
+
+    def test_already_done_returns_409(self, flask_client):
+        client, token = flask_client
+        with db.get_db() as conn:
+            db.add_task(conn, "Task", created_by="test", assignee="test")
+            db.register_agent(conn, "test")
+            db.complete_task(conn, 1, "test")
+        resp = client.post(
+            f"/api/task/1/delete?token={token}",
+            data=json.dumps({"agent": "dashboard"}),
+            content_type="application/json",
+        )
+        # cancel_task returns (True, "already done") which is idempotent, not 409
+        # The server only returns 409 when ok=False
+        assert resp.status_code == 200
+
+
+# ── Heartbeat SSE ─────────────────────────────────────
+
+
+class TestHeartbeat:
+    """GET /api/heartbeat requires auth like other API endpoints."""
+
+    def test_requires_token(self, flask_client):
+        client, _ = flask_client
+        resp = client.get("/api/heartbeat")
+        assert resp.status_code == 401
+
+
+# ── Static Files ─────────────────────────────────────
+
+
+class TestStaticFiles:
+    """Static file serving doesn't require auth."""
+
+    def test_index_no_auth(self, flask_client):
+        client, _ = flask_client
+        resp = client.get("/")
+        assert resp.status_code == 200

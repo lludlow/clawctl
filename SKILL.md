@@ -15,7 +15,7 @@ Every agent should follow this pattern:
 3. **Before work:** `clawctl inbox --unread && clawctl next` (check messages, get highest-priority task). Use `clawctl list --mine` for a full queue view.
 4. **Claim work:** `clawctl claim <id>` then `clawctl start <id>`
 5. **During work:** `clawctl msg <agent> "update" --task <id>` (coordinate)
-6. **After work:** `clawctl done <id> -m "what I did"` then `clawctl next` for the next task
+6. **After work:** `clawctl done <id> -m "what I did" --meta '{"pr":42}'` then `clawctl next` for the next task. Use `--meta` to link PRs, reports, or other artifacts.
 7. **History review:** `clawctl list --all` to see done/cancelled tasks (newest first)
 
 ## Decision Tree
@@ -28,12 +28,14 @@ Every agent should follow this pattern:
 | Finished | `clawctl done <id> -m "Result"` |
 | Need review | `clawctl msg <reviewer> "Ready" --task <id> --type handoff` |
 | Catching up | `clawctl feed --last 20` or `clawctl summary` |
+| Linking artifacts | Add `--meta '{"pr":42,"report":"path/to/file"}'` to `claim`, `start`, `done`, or `block` |
 
 ## Task Statuses
 
 ```
 pending → claimed → in_progress → done
                   ↘ blocked ↗    ↘ cancelled
+                  ↘ review  ↗
 ```
 
 ## CLI Reference
@@ -43,10 +45,10 @@ pending → claimed → in_progress → done
 clawctl add "Subject" [-d "description"] [-p 0|1|2] [--for agent] [--parent id]
 clawctl list [--status STATUS] [--owner AGENT] [--mine] [--all]
 clawctl next
-clawctl claim <id> [--force]
-clawctl start <id>
-clawctl done <id> [-m "note"] [--force]
-clawctl block <id> --by <other-id>
+clawctl claim <id> [--force] [--meta JSON]
+clawctl start <id> [--meta JSON]
+clawctl done <id> [-m "note"] [--force] [--meta JSON]
+clawctl block <id> --by <other-id> [--meta JSON]
 clawctl board
 ```
 
@@ -67,6 +69,6 @@ clawctl whoami
 
 ### Feed
 ```
-clawctl feed [--last N] [--agent NAME]
+clawctl feed [--last N] [--agent NAME] [--meta]
 clawctl summary
 ```

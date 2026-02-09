@@ -1,7 +1,7 @@
 ---
 name: clawctl
-description: Coordinate multi-agent fleets with a shared task board, messaging, and activity feed via CLI. Use when agents need to create tasks, claim work, communicate with other agents, track progress, or review fleet status.
-compatibility: Requires Python >=3.9 and the clawctl package installed.
+description: Coordination layer for OpenClaw agent fleets (tasks, messaging, activity feed, dashboard).
+metadata: {"openclaw":{"emoji":"🛰️","requires":{"bins":["clawctl"]}}}
 ---
 
 # Setup

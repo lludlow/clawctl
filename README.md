@@ -5,20 +5,20 @@ Coordination layer for [OpenClaw](https://github.com/openclaw/openclaw) agent fl
 ```
 $ clawctl board
 
-═══ CLAWCTL ═══  agent: neo
+═══ CLAWCTL ═══  agent: coder
 
 ── ○ pending (2) ──
-  #3 Enumerate open ports on staging box              !
-  #4 Patch CVE-2024-3094 before someone notices
+  #3 Write integration tests for auth endpoint
+  #4 Update API documentation for v2 routes
 
 ── ▶ in_progress (1) ──
-  #1 Scrape vendor API for leaked endpoints     recon
+  #1 Implement user authentication endpoint [coder]
 
 ── ✗ blocked (1) ──
-  #5 Deploy honeypot to DMZ                     ghost
+  #5 Deploy auth service to staging [deployer]
 
 ── ✓ done (1) ──
-  #2 Rotate all prod SSH keys                   cipher
+  #2 Set up database migrations for users table [coder]
 ```
 
 ## Why this exists
@@ -36,10 +36,10 @@ clawctl is the answer for OpenClaw fleets:
 ## Install
 
 ```bash
-# As an OpenClaw skill (recommended)
-openclaw skills install clawctl
+# As an OpenClaw skill (coming soon)
+# openclaw skills install clawctl
 
-# Or standalone
+# Standalone
 git clone https://github.com/lludlow/clawctl.git
 cd clawctl
 pip install .
@@ -56,24 +56,24 @@ pip install -e .
 # Initialize
 clawctl init
 
-# Register your operatives
-clawctl register recon --role "reconnaissance & OSINT"
-clawctl register cipher --role "crypto & key management"
-clawctl register ghost --role "infrastructure & deployment"
+# Register your agents
+clawctl register coder --role "feature implementation & bug fixes"
+clawctl register reviewer --role "code review & quality checks"
+clawctl register deployer --role "CI/CD & infrastructure"
 
 # Create tasks
-clawctl add "Scrape vendor API for leaked endpoints" --for recon
-clawctl add "Rotate all prod SSH keys" -p 1
-clawctl add "Audit deps for supply chain vulns" --parent 1
+clawctl add "Implement user authentication endpoint" --for coder
+clawctl add "Set up database migrations for users table" -p 1
+clawctl add "Write integration tests for auth" --parent 1
 
 # Agent workflow
-CLAW_AGENT=recon clawctl claim 1
-CLAW_AGENT=recon clawctl start 1
-CLAW_AGENT=recon clawctl done 1 -m "Found 3 undocumented endpoints" \
-  --meta '{"report":"/recon/api-surface.md"}'
+CLAW_AGENT=coder clawctl claim 1
+CLAW_AGENT=coder clawctl start 1
+CLAW_AGENT=coder clawctl done 1 -m "Auth endpoint complete, supports JWT" \
+  --meta '{"pr":"/pulls/42","branch":"feat/auth"}'
 
 # Coordinate
-CLAW_AGENT=recon clawctl msg cipher "Key rotation can proceed, attack surface mapped" --task 2
+CLAW_AGENT=coder clawctl msg reviewer "Auth PR is ready for review" --task 1
 
 # Monitor
 clawctl board
@@ -87,19 +87,19 @@ The typical agent loop:
 
 ```bash
 # On startup — check messages, find work
-CLAW_AGENT=ghost clawctl checkin
-CLAW_AGENT=ghost clawctl inbox --unread
-CLAW_AGENT=ghost clawctl next
+CLAW_AGENT=researcher clawctl checkin
+CLAW_AGENT=researcher clawctl inbox --unread
+CLAW_AGENT=researcher clawctl next
 
 # Do the work, then close out
-CLAW_AGENT=ghost clawctl done <id> -m "Honeypot deployed to 10.0.0.42" \
-  --meta '{"host":"10.0.0.42","containers":3}'
+CLAW_AGENT=researcher clawctl done <id> -m "Competitive analysis complete" \
+  --meta '{"report":"~/reports/competitive-analysis.md"}'
 ```
 
 Add a heartbeat to each agent's cron:
 
 ```
-*/10 * * * * CLAW_AGENT=ghost clawctl checkin
+*/10 * * * * CLAW_AGENT=researcher clawctl checkin
 ```
 
 Add to each agent's system prompt or AGENTS.md:
@@ -123,7 +123,7 @@ Only claim tasks assigned to you or matching your role.
 | `next` | Show the highest-priority actionable task for the current agent |
 | `claim ID` | Claim a task. Options: `--force` to override, `--meta JSON` |
 | `start ID` | Begin work (transitions to in_progress). Options: `--meta JSON` |
-| `done ID` | Complete a task. Options: `-m` note, `--meta JSON` |
+| `done ID` | Complete a task. Options: `-m` note, `--force`, `--meta JSON` |
 | `block ID --by OTHER` | Mark task as blocked. Options: `--meta JSON` |
 | `board` | Kanban board view grouped by status |
 
@@ -155,7 +155,7 @@ Only claim tasks assigned to you or matching your role.
 
 | Command | Description |
 |---------|-------------|
-| `dashboard` | Start the web UI. Options: `--port INT` (default: 3737) |
+| `dashboard` | Start the web UI. Options: `--port INT` (default: 3737), `--verbose` |
 | `dashboard --stop` | Stop the running dashboard |
 
 ## Task statuses
@@ -163,20 +163,21 @@ Only claim tasks assigned to you or matching your role.
 ```
 pending ─→ claimed ─→ in_progress ─→ done
                     ↘ blocked ↗     ↘ cancelled
+                    ↘ review  ↗
 ```
 
-`list` excludes done/cancelled by default and sorts by status priority (in_progress > claimed > blocked > pending), oldest first. `--all` flips to newest-first for history browsing.
+`list` excludes done/cancelled by default and sorts by status priority (in_progress > claimed > blocked > review > pending), oldest first. `--all` flips to newest-first for history browsing.
 
 ## Activity metadata
 
 Mutating commands (`claim`, `start`, `done`, `block`) accept `--meta` with a JSON string stored in the activity log. Use it to link back to external artifacts:
 
 ```bash
-clawctl claim 1 --meta '{"source":"github","issue":42}'
-clawctl done 1 -m "Patched and verified" --meta '{"pr":187,"cve":"CVE-2024-3094"}'
+clawctl claim 1 --meta '{"source":"jira","ticket":"AUTH-142"}'
+clawctl done 1 -m "Implemented and tested" --meta '{"pr":42,"tests_passed":true}'
 
 # Review what happened overnight
-clawctl feed --last 50 --agent recon --meta
+clawctl feed --last 50 --agent coder --meta
 ```
 
 ## Web dashboard

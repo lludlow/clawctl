@@ -433,7 +433,6 @@ class TestListTasks:
         db.register_agent(seeded_db, "bob")
         db.complete_task(seeded_db, 3, "bob")
         rows = db.list_tasks(seeded_db, include_all=True)
-        statuses = [row["status"] for row in rows]
         assert "✓" in [row["icon"] for row in rows]
 
     def test_filter_by_status(self, seeded_db):

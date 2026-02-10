@@ -1,6 +1,5 @@
 """clawctl — Click-based command interface for OpenClaw agent fleets."""
 
-import json
 import os
 import signal
 import subprocess
@@ -500,7 +499,7 @@ def dashboard(port, stop, verbose):
     click.echo(f"\n  {C}http://localhost:{port}/?token={token}{N}\n")
     if verbose:
         click.echo(f"Logging to: {log_path}")
-    click.echo(f"Stop with: clawctl dashboard --stop")
+    click.echo("Stop with: clawctl dashboard --stop")
 
 
 @cli.command("help")

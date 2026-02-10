@@ -7,7 +7,6 @@ Each test documents the expected CLI behavior and output.
 import os
 from unittest.mock import patch
 
-from click.testing import CliRunner
 
 from clawctl import db
 from clawctl.cli import cli

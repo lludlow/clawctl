@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "clawctl"
-version = "0.2.0"
+version = "0.2.1"
 description = "Coordination layer for OpenClaw agent fleets"
 readme = "README.md"
 license = "MIT"
@@ -22,7 +22,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-cov"]
+dev = ["pytest", "pytest-cov", "ruff", "mypy"]
 
 [project.scripts]
 clawctl = "clawctl.cli:cli"
@@ -38,6 +38,14 @@ Issues = "https://github.com/lludlow/clawctl/issues"
 [tool.setuptools.package-data]
 clawctl = ["schema.sql"]
 dashboard = ["index.html"]
+
+[tool.ruff]
+target-version = "py39"
+
+[tool.mypy]
+python_version = "3.9"
+ignore_missing_imports = true
+warn_unused_configs = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

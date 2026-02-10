@@ -6,7 +6,6 @@ and Flask test client — all isolated per test.
 
 import os
 import sqlite3
-import tempfile
 from pathlib import Path
 from unittest.mock import patch
 

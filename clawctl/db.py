@@ -95,7 +95,6 @@ def add_task(
     conn, subject, desc="", priority=0, assignee="", created_by="", parent_id=None
 ):
     status = "claimed" if assignee else "pending"
-    claimed_at = "datetime('now')" if assignee else None
 
     if assignee:
         cur = conn.execute(

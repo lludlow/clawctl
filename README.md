@@ -37,6 +37,8 @@ clawctl is the answer for OpenClaw fleets:
 ## Install
 
 ```bash
+uv pip install clawctl
+# or
 pip install clawctl
 ```
 
@@ -45,7 +47,7 @@ Or from source:
 ```bash
 git clone https://github.com/lludlow/clawctl.git
 cd clawctl
-pip install -e .
+uv pip install -e .
 ```
 
 **Requirements:** Python >= 3.9

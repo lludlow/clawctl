@@ -310,6 +310,25 @@ def cancel(id, meta):
 
 @cli.command()
 @click.argument("id", type=int)
+@click.option("--force", is_flag=True, help="Reset even if not owner/creator")
+@click.option("--meta", default=None, help="JSON metadata blob for activity log")
+def reset(id, force, meta):
+    """Reset a task back to pending"""
+    _warn_agent_fallback()
+    agent = db.AGENT
+    with db.get_db() as conn:
+        ok, info = db.reset_task(conn, id, agent, force, meta=meta)
+    if not ok:
+        click.echo(f"{R}{info}{N}", err=True)
+        sys.exit(1)
+    if info == "already pending":
+        click.echo(f"{Y}#{id} already pending{N}")
+    else:
+        click.echo(f"{G}Reset #{id} to pending{N}")
+
+
+@cli.command()
+@click.argument("id", type=int)
 @click.option("--by", "blocked_by", type=int, required=True, help="Blocking task ID")
 @click.option("--meta", default=None, help="JSON metadata blob for activity log")
 def block(id, blocked_by, meta):

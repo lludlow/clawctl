@@ -467,3 +467,33 @@ class TestRejectCommand:
         result = _invoke(cli_env, ["reject", "1"])
         assert result.exit_code == 0
         assert "Rejected" in result.output
+
+
+# ── Reset ────────────────────────────────────────────
+
+
+class TestResetCommand:
+    """'clawctl reset <id>' resets task to pending."""
+
+    def test_prints_confirmation(self, cli_env):
+        _init(cli_env)
+        _invoke(cli_env, ["add", "Task"])
+        _invoke(cli_env, ["cancel", "1"])
+        result = _invoke(cli_env, ["reset", "1"])
+        assert result.exit_code == 0
+        assert "Reset" in result.output
+
+    def test_not_authorized_exits_1(self, cli_env):
+        _init(cli_env)
+        _invoke(cli_env, ["add", "Task", "--for", "bob"], agent="alice")
+        _invoke(cli_env, ["cancel", "1"])
+        result = _invoke(cli_env, ["reset", "1"], agent="charlie")
+        assert result.exit_code == 1
+        assert "not authorized" in result.output
+
+    def test_force_flag(self, cli_env):
+        _init(cli_env)
+        _invoke(cli_env, ["add", "Task", "--for", "bob"], agent="alice")
+        _invoke(cli_env, ["cancel", "1"])
+        result = _invoke(cli_env, ["reset", "1", "--force"], agent="charlie")
+        assert result.exit_code == 0

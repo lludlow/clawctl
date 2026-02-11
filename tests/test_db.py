@@ -776,3 +776,76 @@ class TestRejectTask:
             "SELECT action FROM activity WHERE agent='alice' AND action='task_rejected'"
         ).fetchone()
         assert row is not None
+
+
+# ── Reset ────────────────────────────────────────────
+
+
+class TestResetTask:
+    """reset_task moves a task back to pending."""
+
+    def test_reset_cancelled_to_pending(self, db_conn):
+        db.add_task(db_conn, "Task", created_by="alice")
+        db.cancel_task(db_conn, 1, "alice")
+        ok, _ = db.reset_task(db_conn, 1, "alice")
+        assert ok is True
+        row = db_conn.execute("SELECT status, owner FROM tasks WHERE id=1").fetchone()
+        assert row["status"] == "pending"
+        assert row["owner"] is None or row["owner"] == ""
+
+    def test_reset_blocked_to_pending(self, db_conn):
+        db.add_task(db_conn, "Blocker", created_by="alice")
+        db.add_task(db_conn, "Blocked", created_by="alice", assignee="bob")
+        db.block_task(db_conn, 2, 1)
+        ok, _ = db.reset_task(db_conn, 2, "alice")
+        assert ok is True
+        row = db_conn.execute("SELECT status FROM tasks WHERE id=2").fetchone()
+        assert row["status"] == "pending"
+
+    def test_reset_by_owner(self, db_conn):
+        db.add_task(db_conn, "Task", assignee="bob", created_by="alice")
+        db.cancel_task(db_conn, 1, "bob")
+        ok, _ = db.reset_task(db_conn, 1, "bob")
+        assert ok is True
+
+    def test_reset_by_non_owner_non_creator_fails(self, db_conn):
+        db.add_task(db_conn, "Task", assignee="bob", created_by="alice")
+        db.cancel_task(db_conn, 1, "bob")
+        ok, err = db.reset_task(db_conn, 1, "charlie")
+        assert ok is False
+        assert "not authorized" in err
+
+    def test_reset_force_bypasses_guard(self, db_conn):
+        db.add_task(db_conn, "Task", assignee="bob", created_by="alice")
+        db.cancel_task(db_conn, 1, "bob")
+        ok, _ = db.reset_task(db_conn, 1, "charlie", force=True)
+        assert ok is True
+
+    def test_reset_nonexistent(self, db_conn):
+        ok, err = db.reset_task(db_conn, 999, "alice")
+        assert ok is False
+        assert "not found" in err
+
+    def test_reset_done_task(self, db_conn):
+        """Done tasks can be reset too (re-open)."""
+        db.add_task(db_conn, "Task", assignee="alice", created_by="alice")
+        db.register_agent(db_conn, "alice")
+        db.complete_task(db_conn, 1, "alice")
+        ok, _ = db.reset_task(db_conn, 1, "alice")
+        assert ok is True
+
+    def test_reset_pending_is_noop(self, db_conn):
+        """Resetting an already-pending task is idempotent."""
+        db.add_task(db_conn, "Task", created_by="alice")
+        ok, info = db.reset_task(db_conn, 1, "alice")
+        assert ok is True
+        assert "already pending" in info
+
+    def test_reset_logs_activity(self, db_conn):
+        db.add_task(db_conn, "Task", created_by="alice")
+        db.cancel_task(db_conn, 1, "alice")
+        db.reset_task(db_conn, 1, "alice")
+        row = db_conn.execute(
+            "SELECT action FROM activity WHERE agent='alice' AND action='task_reset'"
+        ).fetchone()
+        assert row is not None

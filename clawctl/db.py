@@ -265,6 +265,31 @@ def cancel_task(conn, task_id, agent, meta=None):
     return True, None
 
 
+def reset_task(conn, task_id, agent, force=False, meta=None):
+    """Reset a task back to pending (clears owner). Creator or owner only unless force."""
+    row = conn.execute(
+        "SELECT id, status, owner, created_by FROM tasks WHERE id=?", (task_id,)
+    ).fetchone()
+    if not row:
+        return False, "not found"
+    if row["status"] == "pending" and (not row["owner"] or row["owner"] == ""):
+        return True, "already pending"
+    if not force and agent != row["owner"] and agent != row["created_by"]:
+        return (
+            False,
+            "not authorized (must be owner or creator, use --force to override)",
+        )
+    conn.execute(
+        """UPDATE tasks SET status='pending', owner=NULL,
+            updated_at=datetime('now') WHERE id=?""",
+        (task_id,),
+    )
+    log_activity(
+        conn, agent, "task_reset", "task", task_id, f"from {row['status']}", meta=meta
+    )
+    return True, None
+
+
 def review_task(conn, task_id, agent, meta=None):
     cur = conn.execute(
         "UPDATE tasks SET status='review', updated_at=datetime('now') WHERE id=? AND owner=?",

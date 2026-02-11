@@ -1262,10 +1262,15 @@ function renderDetail(task, messages) {
         <div class="sheet-grid-cell">
           <div class="sheet-grid-label">Total Duration</div>
           <div class="sheet-grid-value">${(() => {
-            const age = timeInStatus(task.created_at);
-            if (age.hours < 1) return Math.floor(age.minutes) + 'm';
-            if (age.hours < 24) return Math.floor(age.hours) + 'h';
-            return Math.floor(age.hours / 24) + 'd';
+            const endStr = (task.status === 'done' || task.status === 'cancelled') && task.completed_at
+              ? task.completed_at : null;
+            const start = new Date((task.created_at || '').replace(' ', 'T') + 'Z');
+            const end = endStr ? new Date(endStr.replace(' ', 'T') + 'Z') : new Date();
+            const ms = end - start;
+            const hours = ms / 3600000;
+            if (hours < 1) return Math.floor(ms / 60000) + 'm';
+            if (hours < 24) return Math.floor(hours) + 'h';
+            return Math.floor(hours / 24) + 'd';
           })()}</div>
         </div>
       </div>
@@ -1409,7 +1414,8 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && state.selectedTask !== null) {
     closeDetail();
   }
-  if (e.key === 'f' && state.selectedTask === null && !e.ctrlKey && !e.metaKey) {
+  if (e.key === 'f' && state.selectedTask === null && !e.ctrlKey && !e.metaKey
+      && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && !e.target.isContentEditable) {
     toggleFeed();
   }
 });

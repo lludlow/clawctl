@@ -655,3 +655,31 @@ class TestGetBoardApiBlockers:
         db.register_agent(db_conn, "agent-1", "coder")
         _, agents = db.get_board_api(db_conn)
         assert agents[0]["role"] == "coder"
+
+
+# ── Show (Task Detail for CLI) ───────────────────────
+
+
+class TestGetTaskShow:
+    """get_task_show returns task fields, messages, and blockers."""
+
+    def test_returns_task_and_messages(self, seeded_db):
+        db.send_message(seeded_db, "bob", "alice", "Working on it", task_id=3)
+        task, messages, blockers = db.get_task_show(seeded_db, 3)
+        assert task["subject"] == "Implement auth"
+        assert len(messages) == 1
+        assert messages[0]["body"] == "Working on it"
+
+    def test_returns_blockers(self, db_conn):
+        db.add_task(db_conn, "Blocker task", created_by="alice")
+        db.add_task(db_conn, "Blocked task", created_by="alice")
+        db.block_task(db_conn, 2, 1)
+        task, messages, blockers = db.get_task_show(db_conn, 2)
+        assert len(blockers) == 1
+        assert blockers[0]["id"] == 1
+
+    def test_nonexistent_returns_none(self, db_conn):
+        task, messages, blockers = db.get_task_show(db_conn, 999)
+        assert task is None
+        assert messages == []
+        assert blockers == []

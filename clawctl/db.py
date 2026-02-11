@@ -473,3 +473,17 @@ def get_task_detail(conn, task_id):
         (task_id,),
     ).fetchall()
     return task, messages
+
+
+def get_task_show(conn, task_id):
+    """Rich task detail for CLI show command: task + messages + blockers."""
+    task = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+    if not task:
+        return None, [], []
+    messages = conn.execute(
+        """SELECT id, from_agent, body, msg_type, substr(created_at,1,16) AS at
+        FROM messages WHERE task_id=? ORDER BY created_at""",
+        (task_id,),
+    ).fetchall()
+    blockers = get_blockers(conn, task_id)
+    return task, messages, blockers

@@ -882,3 +882,35 @@ class TestResetTask:
             "SELECT action FROM activity WHERE agent='alice' AND action='task_reset'"
         ).fetchone()
         assert row is not None
+
+
+# ── Search ───────────────────────────────────────────
+
+
+class TestSearch:
+    """search queries tasks and messages by keyword."""
+
+    def test_finds_task_by_subject(self, seeded_db):
+        results = db.search(seeded_db, "auth")
+        tasks = results["tasks"]
+        assert len(tasks) >= 1
+        assert any(r["subject"] == "Implement auth" for r in tasks)
+
+    def test_finds_task_by_description(self, db_conn):
+        db.add_task(db_conn, "Task", desc="This involves NAS antivirus setup")
+        results = db.search(db_conn, "antivirus")
+        assert len(results["tasks"]) == 1
+
+    def test_finds_messages(self, seeded_db):
+        results = db.search(seeded_db, "review the auth")
+        msgs = results["messages"]
+        assert len(msgs) >= 1
+
+    def test_no_results(self, db_conn):
+        results = db.search(db_conn, "nonexistent")
+        assert len(results["tasks"]) == 0
+        assert len(results["messages"]) == 0
+
+    def test_case_insensitive(self, seeded_db):
+        results = db.search(seeded_db, "IMPLEMENT")
+        assert len(results["tasks"]) >= 1

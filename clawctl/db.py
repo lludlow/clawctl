@@ -524,6 +524,27 @@ def get_summary(conn):
     }
 
 
+# ── Search ─────────────────────────────────────────────
+
+
+def search(conn, query):
+    """Search tasks and messages by keyword (case-insensitive LIKE)."""
+    pattern = f"%{query}%"
+    tasks = conn.execute(
+        """SELECT id, subject, status, COALESCE(owner, '-') AS owner
+        FROM tasks WHERE subject LIKE ? OR description LIKE ?
+        ORDER BY id DESC LIMIT 20""",
+        (pattern, pattern),
+    ).fetchall()
+    messages = conn.execute(
+        """SELECT id, from_agent, body, task_id, substr(created_at,1,16) AS at
+        FROM messages WHERE body LIKE ?
+        ORDER BY id DESC LIMIT 20""",
+        (pattern,),
+    ).fetchall()
+    return {"tasks": tasks, "messages": messages}
+
+
 # ── API helpers (for Flask) ─────────────────────────────
 
 

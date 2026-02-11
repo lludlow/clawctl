@@ -497,3 +497,29 @@ class TestResetCommand:
         _invoke(cli_env, ["cancel", "1"])
         result = _invoke(cli_env, ["reset", "1", "--force"], agent="charlie")
         assert result.exit_code == 0
+
+
+# ── Search ───────────────────────────────────────────
+
+
+class TestSearchCommand:
+    """'clawctl search <query>' searches tasks and messages."""
+
+    def test_finds_tasks(self, cli_env):
+        _init(cli_env)
+        _invoke(cli_env, ["add", "Build NAS antivirus scanner"])
+        result = _invoke(cli_env, ["search", "antivirus"])
+        assert result.exit_code == 0
+        assert "antivirus" in result.output.lower()
+
+    def test_finds_messages(self, cli_env):
+        _init(cli_env)
+        _invoke(cli_env, ["broadcast", "Deploy the hotfix now"], agent="alice")
+        result = _invoke(cli_env, ["search", "hotfix"])
+        assert result.exit_code == 0
+        assert "hotfix" in result.output.lower()
+
+    def test_no_results(self, cli_env):
+        _init(cli_env)
+        result = _invoke(cli_env, ["search", "nonexistent"])
+        assert "No results" in result.output

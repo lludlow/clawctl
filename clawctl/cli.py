@@ -627,6 +627,44 @@ def legend():
     click.echo(f"  !!!  critical   — Priority 2")
 
 
+@cli.command()
+@click.argument("query")
+def search(query):
+    """Search tasks and messages by keyword"""
+    with db.get_db() as conn:
+        results = db.search(conn, query)
+    tasks = results["tasks"]
+    msgs = results["messages"]
+    if not tasks and not msgs:
+        click.echo("No results.")
+        return
+    if tasks:
+        click.echo(f"{B}Tasks:{N}")
+        print_columnar(
+            tasks,
+            [
+                ("ID", "id"),
+                ("Subject", "subject"),
+                ("Status", "status"),
+                ("Owner", "owner"),
+            ],
+        )
+    if msgs:
+        if tasks:
+            click.echo()
+        click.echo(f"{B}Messages:{N}")
+        print_columnar(
+            msgs,
+            [
+                ("ID", "id"),
+                ("From", "from_agent"),
+                ("Body", "body"),
+                ("Task", "task_id"),
+                ("At", "at"),
+            ],
+        )
+
+
 @cli.command("help")
 @click.pass_context
 def help_cmd(ctx):

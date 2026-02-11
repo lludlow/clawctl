@@ -109,6 +109,15 @@ def complete_task(task_id):
     return jsonify({"success": True})
 
 
+@app.route("/api/feed")
+def feed():
+    limit = request.args.get("limit", 30, type=int)
+    agent_filter = request.args.get("agent", None)
+    with db.get_db() as conn:
+        entries = db.get_feed(conn, limit=limit, agent_filter=agent_filter)
+    return jsonify({"entries": [row_to_dict(e) for e in entries]})
+
+
 @app.route("/api/heartbeat")
 def heartbeat():
     def stream():

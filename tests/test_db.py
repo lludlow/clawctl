@@ -619,3 +619,39 @@ class TestApiHelpers:
         task, messages = db.get_task_detail(db_conn, 999)
         assert task is None
         assert messages == []
+
+
+# ── Board API with blockers ──────────────────────────
+
+
+class TestGetBoardApiBlockers:
+    """get_board_api includes blocker_ids for blocked tasks."""
+
+    def test_includes_blocker_ids_field(self, db_conn):
+        db.add_task(db_conn, "Task A", created_by="test")
+        tasks, _ = db.get_board_api(db_conn)
+        # Every task row should have the blocker_ids field
+        assert "blocker_ids" in tasks[0].keys()
+
+    def test_blocker_ids_populated(self, db_conn):
+        db.add_task(db_conn, "Blocked task", created_by="test")
+        db.add_task(db_conn, "Blocker 1", created_by="test")
+        db.add_task(db_conn, "Blocker 2", created_by="test")
+        db.block_task(db_conn, 1, 2)
+        db.block_task(db_conn, 1, 3)
+        tasks, _ = db.get_board_api(db_conn)
+        blocked = [t for t in tasks if t["id"] == 1][0]
+        ids = blocked["blocker_ids"]
+        # GROUP_CONCAT returns comma-separated string
+        assert "2" in ids
+        assert "3" in ids
+
+    def test_no_blockers_returns_null(self, db_conn):
+        db.add_task(db_conn, "Normal task", created_by="test")
+        tasks, _ = db.get_board_api(db_conn)
+        assert tasks[0]["blocker_ids"] is None
+
+    def test_agents_include_role(self, db_conn):
+        db.register_agent(db_conn, "agent-1", "coder")
+        _, agents = db.get_board_api(db_conn)
+        assert agents[0]["role"] == "coder"

@@ -442,11 +442,14 @@ def get_summary(conn):
 
 def get_board_api(conn):
     tasks = conn.execute(
-        """SELECT id, subject, description, status, owner, priority,
-               created_at, updated_at, claimed_at, completed_at
-        FROM tasks
+        """SELECT t.id, t.subject, t.description, t.status, t.owner, t.priority,
+               t.tags, t.created_at, t.updated_at, t.claimed_at, t.completed_at,
+               GROUP_CONCAT(d.blocked_by) AS blocker_ids
+        FROM tasks t
+        LEFT JOIN task_deps d ON d.task_id = t.id
+        GROUP BY t.id
         ORDER BY
-            CASE status
+            CASE t.status
                 WHEN 'in_progress' THEN 1
                 WHEN 'claimed' THEN 2
                 WHEN 'pending' THEN 3
@@ -454,7 +457,7 @@ def get_board_api(conn):
                 WHEN 'review' THEN 5
                 WHEN 'done' THEN 6
             END,
-            priority DESC, id"""
+            t.priority DESC, t.id"""
     ).fetchall()
     agents = conn.execute(
         "SELECT name, role, status, last_seen FROM agents ORDER BY status, name"

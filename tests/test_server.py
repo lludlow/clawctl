@@ -178,3 +178,36 @@ class TestFeedApi:
         client, _ = flask_client
         resp = client.get("/api/feed")
         assert resp.status_code == 401
+
+
+# ── Blockers API ─────────────────────────────────────
+
+
+class TestBlockersApi:
+    """GET /api/task/<id>/blockers returns blocker tasks."""
+
+    def test_returns_empty_when_no_blockers(self, flask_client):
+        client, token = flask_client
+        with db.get_db() as conn:
+            db.add_task(conn, "Task", created_by="test")
+        resp = client.get(f"/api/task/1/blockers?token={token}")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["blockers"] == []
+
+    def test_returns_blocker_info(self, flask_client):
+        client, token = flask_client
+        with db.get_db() as conn:
+            db.add_task(conn, "Blocked task", created_by="test")
+            db.add_task(conn, "Blocker task", created_by="test")
+            db.block_task(conn, 1, 2)
+        resp = client.get(f"/api/task/1/blockers?token={token}")
+        data = resp.get_json()
+        assert len(data["blockers"]) == 1
+        assert data["blockers"][0]["id"] == 2
+        assert data["blockers"][0]["subject"] == "Blocker task"
+
+    def test_requires_token(self, flask_client):
+        client, _ = flask_client
+        resp = client.get("/api/task/1/blockers")
+        assert resp.status_code == 401

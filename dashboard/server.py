@@ -118,6 +118,13 @@ def feed():
     return jsonify({"entries": [row_to_dict(e) for e in entries]})
 
 
+@app.route("/api/task/<int:task_id>/blockers")
+def task_blockers(task_id):
+    with db.get_db() as conn:
+        blockers = db.get_blockers(conn, task_id)
+    return jsonify({"blockers": [row_to_dict(b) for b in blockers]})
+
+
 @app.route("/api/heartbeat")
 def heartbeat():
     def stream():

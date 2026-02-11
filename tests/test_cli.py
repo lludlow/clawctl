@@ -431,6 +431,23 @@ class TestApproveCommand:
         assert "not in review" in result.output
 
 
+# ── Legend ────────────────────────────────────────────
+
+
+class TestLegendCommand:
+    """'clawctl legend' shows status symbol meanings."""
+
+    def test_shows_all_statuses(self, cli_env):
+        _init(cli_env)
+        result = _invoke(cli_env, ["legend"])
+        assert result.exit_code == 0
+        assert "pending" in result.output
+        assert "in_progress" in result.output
+        assert "review" in result.output
+        assert "blocked" in result.output
+        assert "done" in result.output
+
+
 class TestRejectCommand:
     """'clawctl reject <id>' rejects a task in review."""
 

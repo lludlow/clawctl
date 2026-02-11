@@ -582,6 +582,24 @@ def dashboard(port, stop, verbose):
     click.echo("Stop with: clawctl dashboard --stop")
 
 
+@cli.command()
+def legend():
+    """Show status symbols and their meanings"""
+    click.echo(f"{B}Status Legend{N}")
+    click.echo(f"  ○  pending      — Unassigned, waiting to be claimed")
+    click.echo(f"  ◉  claimed      — Assigned to an agent, not yet started")
+    click.echo(f"  ▶  in_progress  — Being actively worked on")
+    click.echo(f"  ⟳  review       — Work done, waiting for review/approval")
+    click.echo(f"  ✗  blocked      — Cannot proceed (waiting on dependency)")
+    click.echo(f"  ✓  done         — Completed")
+    click.echo(f"  -  cancelled    — Cancelled/discarded")
+    click.echo()
+    click.echo(f"{B}Priority{N}")
+    click.echo(f"       (blank)    — Normal (0)")
+    click.echo(f"  !    high       — Priority 1")
+    click.echo(f"  !!!  critical   — Priority 2")
+
+
 @cli.command("help")
 @click.pass_context
 def help_cmd(ctx):

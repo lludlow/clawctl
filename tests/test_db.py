@@ -370,6 +370,24 @@ class TestReviewTask:
         assert ok is False
         assert "not owned by you" in err
 
+    def test_review_notifies_creator(self, db_conn):
+        """Moving to review sends a notification to created_by agent."""
+        db.add_task(db_conn, "Task", assignee="bob", created_by="alice")
+        db.review_task(db_conn, 1, "bob")
+        msg = db_conn.execute(
+            "SELECT to_agent, body, msg_type FROM messages WHERE task_id=1"
+        ).fetchone()
+        assert msg["to_agent"] == "alice"
+        assert msg["msg_type"] == "status"
+        assert "review" in msg["body"].lower()
+
+    def test_review_no_notification_if_no_creator(self, db_conn):
+        """No notification sent when created_by is empty."""
+        db.add_task(db_conn, "Task", assignee="bob")
+        db.review_task(db_conn, 1, "bob")
+        msg = db_conn.execute("SELECT * FROM messages WHERE task_id=1").fetchone()
+        assert msg is None
+
 
 # ── Blocking & Dependencies ───────────────────────────
 
@@ -708,7 +726,7 @@ class TestApproveTask:
         db.review_task(db_conn, 1, "bob")
         db.approve_task(db_conn, 1, "alice", note="Looks good")
         msg = db_conn.execute(
-            "SELECT body, msg_type, to_agent FROM messages WHERE task_id=1"
+            "SELECT body, msg_type, to_agent FROM messages WHERE task_id=1 AND msg_type='answer'"
         ).fetchone()
         assert "Looks good" in msg["body"]
         assert msg["to_agent"] == "bob"
@@ -752,7 +770,7 @@ class TestRejectTask:
         db.review_task(db_conn, 1, "bob")
         db.reject_task(db_conn, 1, "alice", reason="Missing tests")
         msg = db_conn.execute(
-            "SELECT body, msg_type, to_agent FROM messages WHERE task_id=1"
+            "SELECT body, msg_type, to_agent FROM messages WHERE task_id=1 AND msg_type='answer'"
         ).fetchone()
         assert "Missing tests" in msg["body"]
         assert msg["to_agent"] == "bob"

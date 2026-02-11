@@ -301,6 +301,15 @@ def review_task(conn, task_id, agent, meta=None):
             return False, "not found"
         return False, f"not owned by you (owner: {row['owner']})"
     log_activity(conn, agent, "task_reviewed", "task", task_id, meta=meta)
+    # Notify creator that task is ready for review
+    row = conn.execute(
+        "SELECT subject, created_by FROM tasks WHERE id=?", (task_id,)
+    ).fetchone()
+    if row and row["created_by"] and row["created_by"] != agent:
+        conn.execute(
+            "INSERT INTO messages(from_agent,to_agent,task_id,body,msg_type) VALUES(?,?,?,?,'status')",
+            (agent, row["created_by"], task_id, f"Ready for review: {row['subject']}"),
+        )
     return True, None
 
 

@@ -1409,6 +1409,9 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && state.selectedTask !== null) {
     closeDetail();
   }
+  if (e.key === 'f' && state.selectedTask === null && !e.ctrlKey && !e.metaKey) {
+    toggleFeed();
+  }
 });
 
 // ═══════════════════════════════════════════

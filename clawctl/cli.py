@@ -252,6 +252,46 @@ def review(id, meta):
 
 @cli.command()
 @click.argument("id", type=int)
+@click.option("-m", "--message", "note", default="", help="Approval note")
+@click.option("--meta", default=None, help="JSON metadata blob for activity log")
+def approve(id, note, meta):
+    """Approve a task in review (moves to done)"""
+    _warn_agent_fallback()
+    agent = db.AGENT
+    with db.get_db() as conn:
+        ok, err = db.approve_task(conn, id, agent, note, meta=meta)
+    if ok:
+        msg = f"{G}✓ Approved #{id}{N}"
+        if note:
+            msg += f" — {note}"
+        click.echo(msg)
+    else:
+        click.echo(f"{R}{err}{N}", err=True)
+        sys.exit(1)
+
+
+@cli.command()
+@click.argument("id", type=int)
+@click.option("-m", "--message", "reason", default="", help="Rejection reason")
+@click.option("--meta", default=None, help="JSON metadata blob for activity log")
+def reject(id, reason, meta):
+    """Reject a task in review (moves back to pending)"""
+    _warn_agent_fallback()
+    agent = db.AGENT
+    with db.get_db() as conn:
+        ok, err = db.reject_task(conn, id, agent, reason, meta=meta)
+    if ok:
+        msg = f"{Y}✗ Rejected #{id}{N}"
+        if reason:
+            msg += f" — {reason}"
+        click.echo(msg)
+    else:
+        click.echo(f"{R}{err}{N}", err=True)
+        sys.exit(1)
+
+
+@cli.command()
+@click.argument("id", type=int)
 @click.option("--meta", default=None, help="JSON metadata blob for activity log")
 def cancel(id, meta):
     """Cancel a task"""

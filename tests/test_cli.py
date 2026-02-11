@@ -400,3 +400,53 @@ class TestShowCommand:
         result = _invoke(cli_env, ["show", "999"])
         assert result.exit_code == 1
         assert "not found" in result.output.lower()
+
+
+# ── Approve & Reject ─────────────────────────────────
+
+
+class TestApproveCommand:
+    """'clawctl approve <id>' approves a task in review."""
+
+    def test_prints_confirmation(self, cli_env):
+        _init(cli_env)
+        _invoke(cli_env, ["add", "Task", "--for", "worker"])
+        _invoke(cli_env, ["review", "1"], agent="worker")
+        result = _invoke(cli_env, ["approve", "1"])
+        assert result.exit_code == 0
+        assert "Approved" in result.output
+
+    def test_with_note(self, cli_env):
+        _init(cli_env)
+        _invoke(cli_env, ["add", "Task", "--for", "worker"])
+        _invoke(cli_env, ["review", "1"], agent="worker")
+        result = _invoke(cli_env, ["approve", "1", "-m", "Ship it"])
+        assert "Ship it" in result.output
+
+    def test_not_in_review_exits_1(self, cli_env):
+        _init(cli_env)
+        _invoke(cli_env, ["add", "Task"])
+        result = _invoke(cli_env, ["approve", "1"])
+        assert result.exit_code == 1
+        assert "not in review" in result.output
+
+
+class TestRejectCommand:
+    """'clawctl reject <id>' rejects a task in review."""
+
+    def test_prints_confirmation(self, cli_env):
+        _init(cli_env)
+        _invoke(cli_env, ["add", "Task", "--for", "worker"])
+        _invoke(cli_env, ["review", "1"], agent="worker")
+        result = _invoke(cli_env, ["reject", "1", "-m", "Needs tests"])
+        assert result.exit_code == 0
+        assert "Rejected" in result.output
+
+    def test_requires_reason(self, cli_env):
+        """Reject without -m still works but shows generic message."""
+        _init(cli_env)
+        _invoke(cli_env, ["add", "Task", "--for", "worker"])
+        _invoke(cli_env, ["review", "1"], agent="worker")
+        result = _invoke(cli_env, ["reject", "1"])
+        assert result.exit_code == 0
+        assert "Rejected" in result.output

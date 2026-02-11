@@ -683,3 +683,96 @@ class TestGetTaskShow:
         assert task is None
         assert messages == []
         assert blockers == []
+
+
+# ── Approve & Reject ─────────────────────────────────
+
+
+class TestApproveTask:
+    """approve_task moves task to done and sends approval message."""
+
+    def test_approve_sets_done(self, db_conn):
+        db.add_task(db_conn, "Task", assignee="bob", created_by="alice")
+        db.register_agent(db_conn, "bob")
+        db.review_task(db_conn, 1, "bob")
+        ok, _ = db.approve_task(db_conn, 1, "alice")
+        assert ok is True
+        row = db_conn.execute(
+            "SELECT status, completed_at FROM tasks WHERE id=1"
+        ).fetchone()
+        assert row["status"] == "done"
+        assert row["completed_at"] is not None
+
+    def test_approve_sends_message(self, db_conn):
+        db.add_task(db_conn, "Task", assignee="bob", created_by="alice")
+        db.review_task(db_conn, 1, "bob")
+        db.approve_task(db_conn, 1, "alice", note="Looks good")
+        msg = db_conn.execute(
+            "SELECT body, msg_type, to_agent FROM messages WHERE task_id=1"
+        ).fetchone()
+        assert "Looks good" in msg["body"]
+        assert msg["to_agent"] == "bob"
+
+    def test_approve_only_review_tasks(self, db_conn):
+        """Can only approve tasks in review status."""
+        db.add_task(db_conn, "Task", assignee="bob")
+        ok, err = db.approve_task(db_conn, 1, "alice")
+        assert ok is False
+        assert "not in review" in err
+
+    def test_approve_nonexistent(self, db_conn):
+        ok, err = db.approve_task(db_conn, 999, "alice")
+        assert ok is False
+        assert "not found" in err
+
+    def test_approve_logs_activity(self, db_conn):
+        db.add_task(db_conn, "Task", assignee="bob", created_by="alice")
+        db.review_task(db_conn, 1, "bob")
+        db.approve_task(db_conn, 1, "alice")
+        row = db_conn.execute(
+            "SELECT action FROM activity WHERE agent='alice' AND action='task_approved'"
+        ).fetchone()
+        assert row is not None
+
+
+class TestRejectTask:
+    """reject_task moves task back to pending and sends rejection message."""
+
+    def test_reject_sets_pending(self, db_conn):
+        db.add_task(db_conn, "Task", assignee="bob", created_by="alice")
+        db.review_task(db_conn, 1, "bob")
+        ok, _ = db.reject_task(db_conn, 1, "alice", reason="Needs more tests")
+        assert ok is True
+        row = db_conn.execute("SELECT status, owner FROM tasks WHERE id=1").fetchone()
+        assert row["status"] == "pending"
+        assert row["owner"] is None or row["owner"] == ""
+
+    def test_reject_sends_message(self, db_conn):
+        db.add_task(db_conn, "Task", assignee="bob", created_by="alice")
+        db.review_task(db_conn, 1, "bob")
+        db.reject_task(db_conn, 1, "alice", reason="Missing tests")
+        msg = db_conn.execute(
+            "SELECT body, msg_type, to_agent FROM messages WHERE task_id=1"
+        ).fetchone()
+        assert "Missing tests" in msg["body"]
+        assert msg["to_agent"] == "bob"
+
+    def test_reject_only_review_tasks(self, db_conn):
+        db.add_task(db_conn, "Task", assignee="bob")
+        ok, err = db.reject_task(db_conn, 1, "alice", reason="No")
+        assert ok is False
+        assert "not in review" in err
+
+    def test_reject_nonexistent(self, db_conn):
+        ok, err = db.reject_task(db_conn, 999, "alice", reason="No")
+        assert ok is False
+        assert "not found" in err
+
+    def test_reject_logs_activity(self, db_conn):
+        db.add_task(db_conn, "Task", assignee="bob", created_by="alice")
+        db.review_task(db_conn, 1, "bob")
+        db.reject_task(db_conn, 1, "alice", reason="Incomplete")
+        row = db_conn.execute(
+            "SELECT action FROM activity WHERE agent='alice' AND action='task_rejected'"
+        ).fetchone()
+        assert row is not None

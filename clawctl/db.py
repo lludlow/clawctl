@@ -279,6 +279,56 @@ def review_task(conn, task_id, agent, meta=None):
     return True, None
 
 
+def approve_task(conn, task_id, agent, note="", meta=None):
+    """Approve a task in review: move to done + send approval message."""
+    row = conn.execute(
+        "SELECT id, status, owner FROM tasks WHERE id=?", (task_id,)
+    ).fetchone()
+    if not row:
+        return False, "not found"
+    if row["status"] != "review":
+        return False, f"not in review (status: {row['status']})"
+    conn.execute(
+        """UPDATE tasks SET status='done', completed_at=datetime('now'),
+            updated_at=datetime('now') WHERE id=?""",
+        (task_id,),
+    )
+    conn.execute("UPDATE agents SET status='idle' WHERE name=?", (row["owner"],))
+    body = f"Approved{f': {note}' if note else ''}"
+    if row["owner"]:
+        conn.execute(
+            "INSERT INTO messages(from_agent,to_agent,task_id,body,msg_type) VALUES(?,?,?,?,'answer')",
+            (agent, row["owner"], task_id, body),
+        )
+    log_activity(conn, agent, "task_approved", "task", task_id, note, meta=meta)
+    return True, None
+
+
+def reject_task(conn, task_id, agent, reason="", meta=None):
+    """Reject a task in review: move back to pending, clear owner, send rejection."""
+    row = conn.execute(
+        "SELECT id, status, owner FROM tasks WHERE id=?", (task_id,)
+    ).fetchone()
+    if not row:
+        return False, "not found"
+    if row["status"] != "review":
+        return False, f"not in review (status: {row['status']})"
+    conn.execute(
+        """UPDATE tasks SET status='pending', owner=NULL,
+            updated_at=datetime('now') WHERE id=?""",
+        (task_id,),
+    )
+    conn.execute("UPDATE agents SET status='idle' WHERE name=?", (row["owner"],))
+    body = f"Rejected{f': {reason}' if reason else ''}"
+    if row["owner"]:
+        conn.execute(
+            "INSERT INTO messages(from_agent,to_agent,task_id,body,msg_type) VALUES(?,?,?,?,'answer')",
+            (agent, row["owner"], task_id, body),
+        )
+    log_activity(conn, agent, "task_rejected", "task", task_id, reason, meta=meta)
+    return True, None
+
+
 def block_task(conn, task_id, blocked_by_id, meta=None):
     try:
         conn.execute(

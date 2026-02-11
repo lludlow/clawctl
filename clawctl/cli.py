@@ -142,11 +142,19 @@ def list_cmd(status, owner, mine, include_all):
         rows = db.list_tasks(
             conn, status, owner, db.AGENT if mine else None, include_all
         )
-    if not rows:
+    # Annotate blocked tasks with blocker IDs
+    annotated = []
+    for r in rows:
+        d = dict(r)
+        if d.get("blockers"):
+            ids = d["blockers"].replace(",", ", #")
+            d["subject"] = f"{d['subject']} [blocked by #{ids}]"
+        annotated.append(d)
+    if not annotated:
         click.echo("No tasks found.")
         return
     print_columnar(
-        rows,
+        annotated,
         [
             ("ID", "id"),
             ("Subject", "subject"),
@@ -158,7 +166,7 @@ def list_cmd(status, owner, mine, include_all):
     scope = "mine" if mine else "all agents"
     if not include_all and not status:
         click.echo(
-            f"\n{len(rows)} active ({scope}). Use --all to include done/cancelled."
+            f"\n{len(annotated)} active ({scope}). Use --all to include done/cancelled."
         )
 
 

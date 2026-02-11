@@ -117,32 +117,35 @@ def list_tasks(conn, status=None, owner=None, mine_agent=None, include_all=False
     clauses = []
     params = []
     if status:
-        clauses.append("status=?")
+        clauses.append("t.status=?")
         params.append(status)
     elif not include_all:
-        clauses.append("status NOT IN ('done','cancelled')")
+        clauses.append("t.status NOT IN ('done','cancelled')")
     if owner:
-        clauses.append("owner=?")
+        clauses.append("t.owner=?")
         params.append(owner)
     if mine_agent:
-        clauses.append("owner=?")
+        clauses.append("t.owner=?")
         params.append(mine_agent)
     where = " AND ".join(clauses) if clauses else "1=1"
     # Active work: status order then oldest first. --all: newest first.
     if include_all:
-        order = "id DESC"
+        order = "t.id DESC"
     else:
-        order = """CASE status
+        order = """CASE t.status
             WHEN 'in_progress' THEN 1 WHEN 'claimed' THEN 2 WHEN 'blocked' THEN 3
             WHEN 'review' THEN 4 WHEN 'pending' THEN 5
-            ELSE 6 END, created_at ASC"""
+            ELSE 6 END, t.created_at ASC"""
     rows = conn.execute(
-        f"""SELECT id, subject,
-            CASE status WHEN 'done' THEN '✓' WHEN 'in_progress' THEN '▶' WHEN 'claimed' THEN '◉'
+        f"""SELECT t.id, t.subject,
+            CASE t.status WHEN 'done' THEN '✓' WHEN 'in_progress' THEN '▶' WHEN 'claimed' THEN '◉'
                  WHEN 'blocked' THEN '✗' WHEN 'review' THEN '⟳' ELSE '○' END AS icon,
-            status, COALESCE(owner,'-') AS owner,
-            CASE priority WHEN 2 THEN '!!!' WHEN 1 THEN '!' ELSE '' END AS pri
-            FROM tasks WHERE {where} ORDER BY {order}""",
+            t.status, COALESCE(t.owner,'-') AS owner,
+            CASE t.priority WHEN 2 THEN '!!!' WHEN 1 THEN '!' ELSE '' END AS pri,
+            GROUP_CONCAT(d.blocked_by) AS blockers
+            FROM tasks t
+            LEFT JOIN task_deps d ON d.task_id = t.id
+            WHERE {where} GROUP BY t.id ORDER BY {order}""",
         params,
     ).fetchall()
     return rows

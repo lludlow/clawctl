@@ -469,6 +469,21 @@ class TestListTasks:
         assert icons.index("▶") < icons.index("◉")
         assert icons.index("◉") < icons.index("○")
 
+    def test_blocked_tasks_show_blocker_ids(self, db_conn):
+        """Blocked tasks include blocker IDs in the blockers field."""
+        db.add_task(db_conn, "Blocker", created_by="test")
+        db.add_task(db_conn, "Blocked", created_by="test")
+        db.block_task(db_conn, 2, 1)
+        rows = db.list_tasks(db_conn)
+        blocked = [r for r in rows if r["id"] == 2][0]
+        assert blocked["blockers"] is not None
+        assert "1" in blocked["blockers"]
+
+    def test_unblocked_tasks_have_null_blockers(self, db_conn):
+        db.add_task(db_conn, "Normal task", created_by="test")
+        rows = db.list_tasks(db_conn)
+        assert rows[0]["blockers"] is None
+
 
 class TestGetNextTask:
     """Next task prioritizes agent's own work, then unowned."""

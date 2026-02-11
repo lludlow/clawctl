@@ -135,3 +135,79 @@ class TestStaticFiles:
         client, _ = flask_client
         resp = client.get("/")
         assert resp.status_code == 200
+
+
+# ── Feed API ─────────────────────────────────────────
+
+
+class TestFeedApi:
+    """GET /api/feed returns activity entries."""
+
+    def test_returns_activity_list(self, flask_client):
+        client, token = flask_client
+        # Create some activity by adding a task
+        with db.get_db() as conn:
+            db.add_task(conn, "Test task", created_by="agent-1")
+        resp = client.get(f"/api/feed?token={token}")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "entries" in data
+        assert len(data["entries"]) > 0
+        assert "agent" in data["entries"][0]
+        assert "action" in data["entries"][0]
+
+    def test_filters_by_agent(self, flask_client):
+        client, token = flask_client
+        with db.get_db() as conn:
+            db.add_task(conn, "Task A", created_by="agent-1")
+            db.add_task(conn, "Task B", created_by="agent-2")
+        resp = client.get(f"/api/feed?token={token}&agent=agent-1")
+        data = resp.get_json()
+        assert all(e["agent"] == "agent-1" for e in data["entries"])
+
+    def test_respects_limit(self, flask_client):
+        client, token = flask_client
+        with db.get_db() as conn:
+            for i in range(10):
+                db.add_task(conn, f"Task {i}", created_by="agent-1")
+        resp = client.get(f"/api/feed?token={token}&limit=3")
+        data = resp.get_json()
+        assert len(data["entries"]) == 3
+
+    def test_requires_token(self, flask_client):
+        client, _ = flask_client
+        resp = client.get("/api/feed")
+        assert resp.status_code == 401
+
+
+# ── Blockers API ─────────────────────────────────────
+
+
+class TestBlockersApi:
+    """GET /api/task/<id>/blockers returns blocker tasks."""
+
+    def test_returns_empty_when_no_blockers(self, flask_client):
+        client, token = flask_client
+        with db.get_db() as conn:
+            db.add_task(conn, "Task", created_by="test")
+        resp = client.get(f"/api/task/1/blockers?token={token}")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["blockers"] == []
+
+    def test_returns_blocker_info(self, flask_client):
+        client, token = flask_client
+        with db.get_db() as conn:
+            db.add_task(conn, "Blocked task", created_by="test")
+            db.add_task(conn, "Blocker task", created_by="test")
+            db.block_task(conn, 1, 2)
+        resp = client.get(f"/api/task/1/blockers?token={token}")
+        data = resp.get_json()
+        assert len(data["blockers"]) == 1
+        assert data["blockers"][0]["id"] == 2
+        assert data["blockers"][0]["subject"] == "Blocker task"
+
+    def test_requires_token(self, flask_client):
+        client, _ = flask_client
+        resp = client.get("/api/task/1/blockers")
+        assert resp.status_code == 401

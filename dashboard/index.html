@@ -25,6 +25,7 @@
             'cc-cyan-bright': 'var(--cyan-bright)',
             'cc-red': 'var(--red)',
             'cc-gray': 'var(--gray)',
+            'cc-purple': 'var(--purple)',
           }
         }
       }
@@ -48,6 +49,7 @@
   --cyan-bright: #00ffcc;
   --red: #ff3333;
   --gray: #3a5f3a;
+  --purple: #c084fc;
 }
 
 /* ═══════════════════════════════════════════
@@ -330,6 +332,137 @@ body {
 .agent-dot.active { background: var(--green); }
 .agent-dot.idle { background: var(--amber); }
 .agent-dot.offline { background: var(--gray); }
+
+/* --- Status-specific badge colors --- */
+.task-badge[data-status="pending"]     { border-color: var(--amber); color: var(--amber); }
+.task-badge[data-status="claimed"]     { border-color: var(--amber); color: var(--amber); }
+.task-badge[data-status="in_progress"] { border-color: var(--cyan); color: var(--cyan); }
+.task-badge[data-status="review"]      { border-color: var(--purple); color: var(--purple); }
+.task-badge[data-status="blocked"]     { border-color: var(--red); color: var(--red); }
+.task-badge[data-status="done"]        { border-color: var(--green); color: var(--green); }
+.task-badge[data-status="cancelled"]   { border-color: var(--gray); color: var(--fg-dim); }
+
+/* --- Task card review/cancelled accents --- */
+.task-card[data-status="review"]       { --accent: var(--purple); }
+.task-card[data-status="cancelled"]    { --accent: var(--gray); opacity: 0.6; }
+
+/* --- Time in status --- */
+.task-age {
+  font-size: 0.6rem;
+  color: var(--fg-dim);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.task-age.stale { color: var(--amber); }
+
+/* --- Blocker link on cards --- */
+.task-blockers {
+  font-size: 0.65rem;
+  color: var(--red);
+  margin-top: 0.25rem;
+  cursor: pointer;
+}
+
+.task-blockers:hover { text-decoration: underline; }
+
+/* --- Agent pills in header --- */
+.agent-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  color: var(--fg-dim);
+  cursor: pointer;
+  padding: 0.125rem 0.375rem;
+  border: 1px solid transparent;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.agent-pill:hover {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.agent-pill.active {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+/* --- Feed Panel --- */
+.feed-panel {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg-1);
+  border-top: 2px solid var(--green);
+  z-index: 15;
+  transform: translateY(100%);
+  transition: transform 0.3s ease-out;
+  height: 40vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.feed-panel.visible {
+  transform: translateY(0);
+}
+
+.feed-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.feed-header-title {
+  font-size: 0.75rem;
+  color: var(--fg-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.feed-filters {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.375rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+
+.feed-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem 0.75rem;
+}
+
+.feed-entry {
+  display: grid;
+  grid-template-columns: 4rem 6rem 1fr;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid var(--border);
+  align-items: baseline;
+}
+
+.feed-entry:last-child { border-bottom: none; }
+
+.feed-time { color: var(--fg-dim); }
+.feed-agent { color: var(--green-dim); }
+.feed-action { color: var(--fg); }
+
+.feed-empty {
+  color: var(--fg-dim);
+  font-size: 0.75rem;
+  padding: 1rem 0;
+  text-align: center;
+  font-style: italic;
+}
 
 /* --- Card entrance animation --- */
 .card-enter {
@@ -644,6 +777,7 @@ body {
 .effects-on .glow-amber { text-shadow: 0 0 6px rgba(255, 176, 0, 0.4); }
 .effects-on .glow-red { text-shadow: 0 0 6px rgba(255, 51, 51, 0.4); }
 .effects-on .glow-cyan { text-shadow: 0 0 6px rgba(0, 191, 255, 0.4); }
+.effects-on .glow-purple { text-shadow: 0 0 6px rgba(192, 132, 252, 0.4); }
 
 /* Matrix canvas */
 #matrix-canvas {
@@ -730,6 +864,9 @@ body {
         <p id="header-stats" class="header-stats">$ initializing...</p>
       </div>
       <div class="header-right">
+        <button id="feed-toggle" class="btn-terminal" onclick="toggleFeed()" aria-label="Toggle activity feed">
+          FEED
+        </button>
         <button id="effects-toggle" class="btn-terminal" onclick="toggleEffects()" aria-label="Toggle visual effects">
           FX: <span id="effects-label">OFF</span>
         </button>
@@ -776,6 +913,18 @@ body {
     </div>
   </div>
 
+  <!-- Feed Panel -->
+  <div id="feed-panel" class="feed-panel">
+    <div class="feed-header">
+      <span class="feed-header-title"># Activity Feed</span>
+      <button onclick="toggleFeed()" class="btn-terminal" style="padding: 0.125rem 0.5rem; font-size: 0.65rem;">ESC</button>
+    </div>
+    <div id="feed-filters" class="feed-filters"></div>
+    <div id="feed-body" class="feed-body">
+      <div class="feed-empty">-- no activity --</div>
+    </div>
+  </div>
+
   <!-- Loading overlay -->
   <div id="loading" class="loading-overlay">
     <div class="loading-ascii">
@@ -812,6 +961,9 @@ const state = {
   matrixRaf: null,
   sheetFocusTrap: null,
   previousFocus: null,
+  feedAgentFilter: null,
+  feedEntries: [],
+  feedOpen: false,
 };
 
 // ═══════════════════════════════════════════
@@ -873,22 +1025,35 @@ async function fetchBoard() {
   }
 }
 
+function renderHeaderAgents() {
+  if (state.agents.length === 0) {
+    return '$ fleet: <span style="color:var(--fg-dim)">no agents</span> <span style="color:var(--fg-dim)">|</span> <span style="color:var(--amber)">' + state.tasks.length + ' tasks</span>';
+  }
+  const pills = state.agents.map(a => {
+    const st = getAgentStatus(a);
+    const isActive = state.feedAgentFilter === a.name;
+    return '<span class="agent-pill ' + (isActive ? 'active' : '') + '" onclick="toggleAgentFilter(\'' + escapeHtml(a.name) + '\')">'
+      + '<span class="agent-dot ' + st + '"></span>' + escapeHtml(a.name) + '</span>';
+  }).join(' ');
+  const activeCount = state.agents.filter(a => a.status === 'busy').length;
+  return '$ fleet: ' + pills + ' <span style="color:var(--fg-dim)">|</span> <span style="color:var(--cyan)">' + activeCount + ' active</span> <span style="color:var(--fg-dim)">|</span> <span style="color:var(--amber)">' + state.tasks.length + ' tasks</span>';
+}
+
 function renderBoard() {
   const board = document.getElementById('board');
   const groups = {
-    pending: state.tasks.filter(t => t.status === 'pending' || t.status === 'claimed'),
-    in_progress: state.tasks.filter(t => t.status === 'in_progress'),
+    queued: state.tasks.filter(t => t.status === 'pending' || t.status === 'claimed'),
+    active: state.tasks.filter(t => t.status === 'in_progress' || t.status === 'review'),
     blocked: state.tasks.filter(t => t.status === 'blocked'),
-    done: state.tasks.filter(t => t.status === 'done')
+    done: state.tasks.filter(t => t.status === 'done' || t.status === 'cancelled')
   };
 
-  const activeAgents = state.agents.filter(a => a.status === 'busy').length;
   const statsEl = document.getElementById('header-stats');
-  statsEl.innerHTML = `$ fleet: <span style="color:var(--green)">${state.agents.length} agents</span> <span style="color:var(--fg-dim)">|</span> <span style="color:var(--cyan)">${activeAgents} active</span> <span style="color:var(--fg-dim)">|</span> <span style="color:var(--amber)">${state.tasks.length} tasks</span>`;
+  statsEl.innerHTML = renderHeaderAgents();
 
   let html = '<div id="skeleton" style="display:none;"></div>';
-  html += renderSection('pending', '[ ]', 'Pending', groups.pending, 'var(--amber)');
-  html += renderSection('in_progress', '[>]', 'In Progress', groups.in_progress, 'var(--cyan)');
+  html += renderSection('queued', '[ ]', 'Queued', groups.queued, 'var(--amber)');
+  html += renderSection('active', '[>]', 'Active', groups.active, 'var(--cyan)');
   if (groups.blocked.length > 0) {
     html += renderSection('blocked', '[X]', 'Blocked', groups.blocked, 'var(--red)');
   }
@@ -896,7 +1061,6 @@ function renderBoard() {
 
   board.innerHTML = html;
 
-  // Animate card entrances
   if (state.effectsOn && !prefersReducedMotion()) {
     requestAnimationFrame(() => {
       const cards = board.querySelectorAll('.card-enter');
@@ -937,6 +1101,7 @@ function renderSection(id, bracket, label, tasks, color, collapsed = false) {
 function renderCard(task, index) {
   const agent = state.agents.find(a => a.name === task.owner);
   const agentStatus = agent ? getAgentStatus(agent) : 'offline';
+  const agentRole = agent ? agent.role : '';
   const shouldAnimate = state.effectsOn && !prefersReducedMotion();
 
   let priorityBadge = '';
@@ -947,33 +1112,48 @@ function renderCard(task, index) {
   }
 
   const tags = task.tags ? (typeof task.tags === 'string' ? task.tags.split(',').map(s=>s.trim()).filter(Boolean) : task.tags) : [];
-  const tagsHtml = tags.length > 0 ? `<div class="task-tags">${tags.map(t => `<span class="task-tag">${escapeHtml(t)}</span>`).join('')}</div>` : '';
+  const tagsHtml = tags.length > 0 ? '<div class="task-tags">' + tags.map(t => '<span class="task-tag">' + escapeHtml(t) + '</span>').join('') + '</div>' : '';
 
-  return `
-    <div class="task-card ${shouldAnimate ? 'card-enter' : ''}" data-status="${task.status}"
-         onclick="openDetail(${task.id})" tabindex="0" role="button"
-         onkeydown="if(event.key==='Enter')openDetail(${task.id})">
-      <div class="task-card-top">
-        <div>
-          <span class="task-id">#${task.id}</span>
-          <span class="task-subject">${escapeHtml(task.subject)}</span>
-          ${priorityBadge}
-        </div>
-        <span class="task-badge">${task.status.replace('_', ' ')}</span>
-      </div>
-      <div class="task-meta">
-        ${task.owner ? `
-          <span class="task-agent">
-            <span class="agent-dot ${agentStatus}"></span>
-            ${escapeHtml(task.owner)}
-          </span>
-          <span class="task-meta-sep">//</span>
-        ` : '<span style="color:var(--fg-dim)">unassigned</span><span class="task-meta-sep">//</span>'}
-        <span>${timeAgo(task.updated_at || task.created_at)}</span>
-      </div>
-      ${tagsHtml}
-    </div>
-  `;
+  const age = timeInStatus(task.updated_at || task.created_at);
+  const isStale = age.hours >= 24;
+  const ageLabel = age.hours < 1 ? Math.floor(age.minutes) + 'm' : age.hours < 24 ? Math.floor(age.hours) + 'h' : Math.floor(age.hours / 24) + 'd';
+
+  let blockerHtml = '';
+  if (task.status === 'blocked' && task.blocker_ids) {
+    const ids = task.blocker_ids.split(',');
+    const links = ids.map(id => '<span onclick="event.stopPropagation();openDetail(' + id + ')">#' + id + '</span>').join(', ');
+    blockerHtml = '<div class="task-blockers">blocked by ' + links + '</div>';
+  }
+
+  const statusDisplay = task.status === 'in_progress' ? 'in progress' : task.status;
+
+  return '<div class="task-card ' + (shouldAnimate ? 'card-enter' : '') + '" data-status="' + task.status + '"'
+    + ' onclick="openDetail(' + task.id + ')" tabindex="0" role="button"'
+    + ' onkeydown="if(event.key===\'Enter\')openDetail(' + task.id + ')">'
+    + '<div class="task-card-top">'
+    + '<div>'
+    + '<span class="task-id">#' + task.id + '</span>'
+    + '<span class="task-subject">' + escapeHtml(task.subject) + '</span>'
+    + priorityBadge
+    + '</div>'
+    + '<div style="display:flex;align-items:center;gap:0.375rem;">'
+    + '<span class="task-age ' + (isStale ? 'stale' : '') + '">' + ageLabel + '</span>'
+    + '<span class="task-badge" data-status="' + task.status + '">' + statusDisplay + '</span>'
+    + '</div>'
+    + '</div>'
+    + '<div class="task-meta">'
+    + (task.owner
+      ? '<span class="task-agent">'
+        + '<span class="agent-dot ' + agentStatus + '"></span>'
+        + escapeHtml(task.owner) + (agentRole ? ' <span style="color:var(--fg-dim)">(' + escapeHtml(agentRole) + ')</span>' : '')
+        + '</span>'
+        + '<span class="task-meta-sep">//</span>'
+      : '<span style="color:var(--fg-dim)">unassigned</span><span class="task-meta-sep">//</span>')
+    + '<span>' + timeAgo(task.updated_at || task.created_at) + '</span>'
+    + '</div>'
+    + blockerHtml
+    + tagsHtml
+    + '</div>';
 }
 
 // ═══════════════════════════════════════════
@@ -1015,6 +1195,9 @@ async function openDetail(taskId) {
     // Focus the first interactive element in the sheet
     const firstBtn = sheet.querySelector('.btn-sheet');
     if (firstBtn) firstBtn.focus();
+    if (data.task && data.task.status === 'blocked') {
+      loadBlockers(data.task.id);
+    }
   } catch (e) {
     content.innerHTML = `
       <div class="error-container" style="margin: 1rem auto;">
@@ -1067,12 +1250,44 @@ function renderDetail(task, messages) {
           <div class="sheet-grid-label">Created</div>
           <div class="sheet-grid-value">${timeAgo(task.created_at)}</div>
         </div>
+        <div class="sheet-grid-cell">
+          <div class="sheet-grid-label">Time in Status</div>
+          <div class="sheet-grid-value">${(() => {
+            const age = timeInStatus(task.updated_at || task.created_at);
+            if (age.hours < 1) return Math.floor(age.minutes) + 'm';
+            if (age.hours < 24) return Math.floor(age.hours) + 'h';
+            return Math.floor(age.hours / 24) + 'd';
+          })()}</div>
+        </div>
+        <div class="sheet-grid-cell">
+          <div class="sheet-grid-label">Total Duration</div>
+          <div class="sheet-grid-value">${(() => {
+            const endStr = (task.status === 'done' || task.status === 'cancelled') && task.completed_at
+              ? task.completed_at : null;
+            const start = new Date((task.created_at || '').replace(' ', 'T') + 'Z');
+            const end = endStr ? new Date(endStr.replace(' ', 'T') + 'Z') : new Date();
+            const ms = end - start;
+            const hours = ms / 3600000;
+            if (hours < 1) return Math.floor(ms / 60000) + 'm';
+            if (hours < 24) return Math.floor(hours) + 'h';
+            return Math.floor(hours / 24) + 'd';
+          })()}</div>
+        </div>
       </div>
 
       ${task.description ? `
         <div style="margin-bottom: 1rem;">
           <div class="sheet-section-title"># Description</div>
           <div style="background: var(--bg-0); border: 1px solid var(--border); padding: 0.75rem; font-size: 0.75rem; white-space: pre-wrap; color: var(--fg);">${escapeHtml(task.description)}</div>
+        </div>
+      ` : ''}
+
+      ${task.status === 'blocked' ? `
+        <div style="margin-bottom: 1rem;">
+          <div class="sheet-section-title"># Blocked By</div>
+          <div id="sheet-blockers" style="font-size: 0.75rem; color: var(--red);">
+            Loading blockers...
+          </div>
         </div>
       ` : ''}
 
@@ -1133,6 +1348,25 @@ function closeDetail() {
   state.selectedTask = null;
 }
 
+async function loadBlockers(taskId) {
+  const el = document.getElementById('sheet-blockers');
+  if (!el) return;
+  try {
+    const res = await fetch('/api/task/' + taskId + '/blockers?token=' + state.token);
+    const data = await res.json();
+    if (data.blockers.length === 0) {
+      el.textContent = 'No blockers found';
+      return;
+    }
+    el.innerHTML = data.blockers.map(b =>
+      '<div style="padding: 0.25rem 0; cursor: pointer;" onclick="closeDetail();setTimeout(()=>openDetail(' + b.id + '),350)">'
+      + '#' + b.id + ' ' + escapeHtml(b.subject) + ' <span style="color:var(--fg-dim)">(' + b.status + ')</span></div>'
+    ).join('');
+  } catch (e) {
+    el.textContent = 'Failed to load blockers';
+  }
+}
+
 // ═══════════════════════════════════════════
 // FOCUS TRAP
 // ═══════════════════════════════════════════
@@ -1180,6 +1414,10 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && state.selectedTask !== null) {
     closeDetail();
   }
+  if (e.key === 'f' && state.selectedTask === null && !e.ctrlKey && !e.metaKey
+      && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && !e.target.isContentEditable) {
+    toggleFeed();
+  }
 });
 
 // ═══════════════════════════════════════════
@@ -1221,6 +1459,76 @@ async function completeTask(taskId) {
   }
 }
 
+function toggleAgentFilter(agentName) {
+  if (state.feedAgentFilter === agentName) {
+    state.feedAgentFilter = null;
+  } else {
+    state.feedAgentFilter = agentName;
+  }
+  document.getElementById('header-stats').innerHTML = renderHeaderAgents();
+  if (state.feedOpen) {
+    fetchFeed();
+  }
+}
+
+// ═══════════════════════════════════════════
+// FEED
+// ═══════════════════════════════════════════
+function toggleFeed() {
+  state.feedOpen = !state.feedOpen;
+  const panel = document.getElementById('feed-panel');
+  const btn = document.getElementById('feed-toggle');
+  if (state.feedOpen) {
+    fetchFeed();
+    panel.classList.add('visible');
+    btn.classList.add('active');
+    document.getElementById('board').style.paddingBottom = 'calc(40vh + 2rem)';
+  } else {
+    panel.classList.remove('visible');
+    btn.classList.remove('active');
+    document.getElementById('board').style.paddingBottom = '6rem';
+  }
+}
+
+async function fetchFeed() {
+  try {
+    let url = '/api/feed?token=' + state.token + '&limit=30';
+    if (state.feedAgentFilter) {
+      url += '&agent=' + encodeURIComponent(state.feedAgentFilter);
+    }
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const data = await res.json();
+    state.feedEntries = data.entries;
+    renderFeed();
+  } catch (e) {
+    console.error('Feed fetch error:', e);
+  }
+}
+
+function renderFeed() {
+  const filtersEl = document.getElementById('feed-filters');
+  const uniqueAgents = [...new Set(state.agents.map(a => a.name))];
+  filtersEl.innerHTML = uniqueAgents.map(name => {
+    const isActive = state.feedAgentFilter === name;
+    return '<span class="agent-pill ' + (isActive ? 'active' : '') + '" onclick="toggleAgentFilter(\'' + escapeHtml(name) + '\')">' + escapeHtml(name) + '</span>';
+  }).join('');
+
+  const bodyEl = document.getElementById('feed-body');
+  if (state.feedEntries.length === 0) {
+    bodyEl.innerHTML = '<div class="feed-empty">-- no activity --</div>';
+    return;
+  }
+
+  bodyEl.innerHTML = state.feedEntries.map(e =>
+    '<div class="feed-entry">'
+    + '<span class="feed-time">' + timeAgo(e.at) + '</span>'
+    + '<span class="feed-agent">' + escapeHtml(e.agent || '') + '</span>'
+    + '<span class="feed-action">' + escapeHtml(e.action) + (e.detail ? ' <span style="color:var(--fg-dim)">' + escapeHtml(e.detail) + '</span>' : '') + '</span>'
+    + '</div>'
+  ).join('');
+}
+
 // ═══════════════════════════════════════════
 // REAL-TIME (SSE)
 // ═══════════════════════════════════════════
@@ -1243,6 +1551,7 @@ function connectSSE() {
       const data = JSON.parse(e.data);
       if (data.refresh) {
         fetchBoard();
+        if (state.feedOpen) fetchFeed();
       }
     } catch (err) {
       console.error('SSE parse error:', err);
@@ -1270,6 +1579,7 @@ function showSSEBanner(connected) {
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) {
     fetchBoard();
+    if (state.feedOpen) fetchFeed();
     if (!state.eventSource || state.eventSource.readyState === EventSource.CLOSED) {
       connectSSE();
     }
@@ -1423,6 +1733,13 @@ function timeAgo(dateStr) {
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
   return `${Math.floor(seconds / 86400)}d ago`;
+}
+
+function timeInStatus(dateStr) {
+  if (!dateStr) return { minutes: 0, hours: 0 };
+  const date = new Date(dateStr.replace(' ', 'T') + 'Z');
+  const ms = Date.now() - date.getTime();
+  return { minutes: Math.floor(ms / 60000), hours: ms / 3600000 };
 }
 
 function getAgentStatus(agent) {

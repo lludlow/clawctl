@@ -312,6 +312,46 @@ def board():
 
 
 @cli.command()
+@click.argument("id", type=int)
+def show(id):
+    """Show task detail, message thread, and blockers"""
+    with db.get_db() as conn:
+        task, messages, blockers = db.get_task_show(conn, id)
+    if not task:
+        click.echo(f"{R}Task #{id} not found{N}", err=True)
+        sys.exit(1)
+    pri_map = {0: "", 1: "high", 2: "critical"}
+    pri = pri_map.get(task["priority"], "")
+    click.echo(f"{B}#{task['id']} {task['subject']}{N}")
+    click.echo(f"  Status:   {task['status']}")
+    if task["owner"]:
+        click.echo(f"  Owner:    {task['owner']}")
+    if task["created_by"]:
+        click.echo(f"  Creator:  {task['created_by']}")
+    if pri:
+        click.echo(f"  Priority: {pri}")
+    if task["description"]:
+        click.echo(f"  Desc:     {task['description']}")
+    click.echo(f"  Created:  {task['created_at']}")
+    if task["claimed_at"]:
+        click.echo(f"  Claimed:  {task['claimed_at']}")
+    if task["completed_at"]:
+        click.echo(f"  Done:     {task['completed_at']}")
+    if blockers:
+        click.echo(f"\n{R}Blocked by:{N}")
+        for b in blockers:
+            click.echo(f"  #{b['id']} {b['subject']} [{b['status']}]")
+    if messages:
+        click.echo(f"\n{C}Messages:{N}")
+        for m in messages:
+            click.echo(
+                f"  [{m['at']}] {m['from_agent']} ({m['msg_type']}): {m['body']}"
+            )
+    elif not blockers:
+        click.echo("\n  No messages.")
+
+
+@cli.command()
 @click.argument("to")
 @click.argument("body")
 @click.option("--task", "task_id", type=int, default=None, help="Related task ID")

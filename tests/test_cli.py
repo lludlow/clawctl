@@ -360,3 +360,43 @@ class TestSummaryCommand:
         assert result.exit_code == 0
         assert "SUMMARY" in result.output
         assert "Open tasks" in result.output
+
+
+# ── Show ─────────────────────────────────────────────
+
+
+class TestShowCommand:
+    """'clawctl show <id>' displays task detail and message thread."""
+
+    def test_shows_task_fields(self, cli_env):
+        _init(cli_env)
+        _invoke(
+            cli_env, ["add", "Build feature", "-d", "Detailed description", "-p", "2"]
+        )
+        result = _invoke(cli_env, ["show", "1"])
+        assert result.exit_code == 0
+        assert "Build feature" in result.output
+        assert "Detailed description" in result.output
+        assert "critical" in result.output.lower() or "!!!" in result.output
+
+    def test_shows_message_thread(self, cli_env):
+        _init(cli_env)
+        _invoke(cli_env, ["add", "Task", "--for", "test-agent"])
+        _invoke(cli_env, ["msg", "test-agent", "Please review", "--task", "1"])
+        result = _invoke(cli_env, ["show", "1"])
+        assert "Please review" in result.output
+
+    def test_shows_blockers(self, cli_env):
+        _init(cli_env)
+        _invoke(cli_env, ["add", "First"])
+        _invoke(cli_env, ["add", "Second"])
+        _invoke(cli_env, ["block", "2", "--by", "1"])
+        result = _invoke(cli_env, ["show", "2"])
+        assert "First" in result.output
+        assert "blocked" in result.output.lower()
+
+    def test_nonexistent_exits_1(self, cli_env):
+        _init(cli_env)
+        result = _invoke(cli_env, ["show", "999"])
+        assert result.exit_code == 1
+        assert "not found" in result.output.lower()

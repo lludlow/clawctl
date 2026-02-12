@@ -17,17 +17,18 @@ The `clawctl` entrypoint is registered via `pyproject.toml` `[project.scripts]`.
 
 ## Testing
 
-No test framework yet. Manual verification against a temp database:
+pytest + pytest-cov, installed via `[project.optional-dependencies] dev`.
 
 ```bash
-CLAW_DB=/tmp/test.db .venv/bin/clawctl init
-CLAW_DB=/tmp/test.db .venv/bin/clawctl add "Test task" -p 1
-CLAW_DB=/tmp/test.db CLAW_AGENT=agent1 .venv/bin/clawctl claim 1
-CLAW_DB=/tmp/test.db .venv/bin/clawctl board
-rm -f /tmp/test.db
+.venv/bin/pip install -e ".[dev]"
+.venv/bin/python -m pytest tests/ --cov=clawctl --cov=dashboard --cov-report=term-missing
 ```
 
-Always use `CLAW_DB=/tmp/test.db` to avoid touching the real database at `~/.openclaw/clawctl.db`.
+- **181 tests** across 3 files: `test_db.py`, `test_cli.py`, `test_server.py`
+- `db.py` tests use in-memory SQLite via `db_conn` fixture (no file I/O)
+- CLI tests use Click's `CliRunner` + patched `DB_PATH` for isolation
+- Flask tests use `flask_client` fixture that patches DB_PATH and TOKEN
+- SSE heartbeat endpoint is untestable in unit tests (infinite stream blocks)
 
 ## Architecture
 
@@ -36,7 +37,7 @@ Two separate layers share `clawctl.db` — the CLI writes directly to SQLite, Fl
 - **`clawctl/db.py`** — All SQL lives here. Every query uses `?` parameterized placeholders. Mutating functions return `(ok: bool, payload)` tuples. The `get_db()` context manager handles commit/rollback/close. This module is imported by both the CLI and the Flask server.
 - **`clawctl/cli.py`** — Click commands. Each subcommand is a thin wrapper that calls `db.*` functions and formats output. The `print_columnar()` helper handles aligned table output with Unicode-aware width calculation.
 - **`clawctl/schema.sql`** — Loaded by `db.init_db()` via `Path(__file__).parent`. Uses `CREATE TABLE IF NOT EXISTS` so re-running init is safe.
-- **`dashboard/server.py`** — Flask app that imports `clawctl.db`. Read-only except for claim/complete endpoints. Persistent auth token saved to `~/.openclaw/.clawctl-token`. Not part of the installable package.
+- **`dashboard/server.py`** — Flask app that imports `clawctl.db`. Read-mostly with mutating endpoints for complete/delete/approve/reject/reset. Persistent auth token saved to `~/.openclaw/.clawctl-token`. Not part of the installable package.
 - **`dashboard/index.html`** — Single-file vanilla JS web UI. Tailwind via CDN. SSE for live updates.
 
 ## Key Design Decisions

@@ -114,7 +114,8 @@ Add to each agent's system prompt or AGENTS.md:
 
 ```
 Before starting work: clawctl inbox --unread && clawctl list --mine
-After completing work: clawctl done <id> -m "what I did"
+After completing work: clawctl review <id>  (submits for approval)
+When approved by coordinator: task auto-moves to done
 Only claim tasks assigned to you or matching your role.
 ```
 
@@ -133,9 +134,15 @@ Only claim tasks assigned to you or matching your role.
 | `start ID` | Begin work (transitions to in_progress). Options: `--meta JSON` |
 | `done ID` | Complete a task. Options: `-m` note, `--force`, `--meta JSON` |
 | `review ID` | Mark task as ready for review. Options: `--meta JSON` |
+| `approve ID` | Approve a task in review (moves to done). Options: `-m` note, `--meta JSON` |
+| `reject ID` | Reject a task in review (back to pending). Options: `-r` reason (required), `--meta JSON` |
+| `reset ID` | Move a done/cancelled/blocked task back to pending. Options: `--force`, `--meta JSON` |
 | `cancel ID` | Cancel a task. Options: `--meta JSON` |
 | `block ID --by OTHER` | Mark task as blocked. Options: `--meta JSON` |
+| `show ID` | Rich detail view: status grid, description, message thread, blockers |
+| `search QUERY` | Full-text search across task subjects, descriptions, and messages |
 | `board` | Kanban board view grouped by status |
+| `legend` | Quick reference for all status symbols |
 
 ### Messages
 
@@ -176,11 +183,11 @@ pending ─→ claimed ─→ in_progress ─→ done
                     ↘ review  ↗
 ```
 
-`list` excludes done/cancelled by default and sorts by status priority (in_progress > claimed > blocked > review > pending), oldest first. `--all` flips to newest-first for history browsing.
+`list` excludes done/cancelled by default and sorts by status priority (in_progress > claimed > blocked > review > pending), oldest first. Blocked tasks show their blocker IDs inline. `--all` flips to newest-first for history browsing.
 
 ## Activity metadata
 
-Mutating commands (`claim`, `start`, `done`, `block`) accept `--meta` with a JSON string stored in the activity log. Use it to link back to external artifacts:
+Mutating commands (`claim`, `start`, `done`, `block`, `approve`, `reject`, `reset`) accept `--meta` with a JSON string stored in the activity log. Use it to link back to external artifacts:
 
 ```bash
 clawctl claim 1 --meta '{"source":"whatsapp","channel":"general"}'
@@ -201,14 +208,19 @@ clawctl dashboard
 
 Features:
 - Live board with SSE push updates (no polling)
-- Task detail view with messages and metadata grid
-- Complete and delete actions from the UI
+- Task detail view with messages, metadata grid, and blocker links
+- **Approve, reject, and reset** actions from the detail sheet
+- **Search bar** (`/` to focus) with results overlay for tasks and messages
+- **Activity feed panel** (`f` to toggle) with per-agent filtering
+- Agent pills in header showing fleet status (active/idle/offline)
+- Status badges and time-in-status on every card
+- Blocked task cards show clickable blocker IDs
 - Terminal/hacker aesthetic with optional CRT effects
-- Keyboard accessible (Esc to close, Tab trapping in modals)
+- Keyboard accessible (`Esc` to close, `Tab` trapping in modals, `/` for search, `f` for feed)
 - Works on narrow viewports
 - Token persisted at `~/.openclaw/.clawctl-token` across restarts
 
-The dashboard is read-mostly — it shares the same SQLite database the CLI writes to. The CLI is the primary interface; the dashboard is for monitoring.
+The dashboard shares the same SQLite database the CLI writes to. The CLI is the primary interface; the dashboard provides a visual overview with full review workflow support.
 
 ## Architecture
 

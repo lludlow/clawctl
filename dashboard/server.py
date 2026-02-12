@@ -109,6 +109,57 @@ def complete_task(task_id):
     return jsonify({"success": True})
 
 
+@app.route("/api/task/<int:task_id>/approve", methods=["POST"])
+def approve_task(task_id):
+    data = request.get_json() or {}
+    agent = data.get("agent", "dashboard")
+    note = data.get("note", "")
+    with db.get_db() as conn:
+        ok, err = db.approve_task(conn, task_id, agent, note)
+    if not ok:
+        return jsonify({"success": False, "error": err}), 409
+    return jsonify({"success": True})
+
+
+@app.route("/api/task/<int:task_id>/reject", methods=["POST"])
+def reject_task(task_id):
+    data = request.get_json() or {}
+    agent = data.get("agent", "dashboard")
+    reason = data.get("reason", "")
+    with db.get_db() as conn:
+        ok, err = db.reject_task(conn, task_id, agent, reason)
+    if not ok:
+        return jsonify({"success": False, "error": err}), 409
+    return jsonify({"success": True})
+
+
+@app.route("/api/task/<int:task_id>/reset", methods=["POST"])
+def reset_task(task_id):
+    data = request.get_json() or {}
+    agent = data.get("agent", "dashboard")
+    force = data.get("force", True)
+    with db.get_db() as conn:
+        ok, err = db.reset_task(conn, task_id, agent, force=force)
+    if not ok:
+        return jsonify({"success": False, "error": err}), 409
+    return jsonify({"success": True})
+
+
+@app.route("/api/search")
+def search_tasks():
+    q = request.args.get("q", "").strip()
+    if not q:
+        return jsonify({"tasks": [], "messages": []})
+    with db.get_db() as conn:
+        results = db.search(conn, q)
+    return jsonify(
+        {
+            "tasks": [row_to_dict(t) for t in results["tasks"]],
+            "messages": [row_to_dict(m) for m in results["messages"]],
+        }
+    )
+
+
 @app.route("/api/feed")
 def feed():
     limit = request.args.get("limit", 30, type=int)

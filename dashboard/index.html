@@ -864,6 +864,12 @@ body {
         <p id="header-stats" class="header-stats">$ initializing...</p>
       </div>
       <div class="header-right">
+        <form id="search-form" onsubmit="doSearch(event)" style="display:flex;align-items:center;gap:0;">
+          <input id="search-input" type="text" placeholder="/ search..." class="btn-terminal"
+            style="width:120px;outline:none;background:var(--bg-1);font-family:inherit;"
+            aria-label="Search tasks and messages">
+          <button type="submit" class="btn-terminal" style="border-left:none;">GO</button>
+        </form>
         <button id="feed-toggle" class="btn-terminal" onclick="toggleFeed()" aria-label="Toggle activity feed">
           FEED
         </button>
@@ -943,6 +949,17 @@ body {
     <div class="error-container">
       <div class="error-label glow-red">[ERROR] <span id="error-message">Connection failed</span></div>
       <div class="error-hint" style="margin-top: 0.75rem;">$ clawctl dashboard --help</div>
+    </div>
+  </div>
+
+  <!-- Search Results Overlay -->
+  <div id="search-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:40;" onclick="closeSearch(event)">
+    <div style="max-width:500px;margin:4rem auto;background:var(--bg-1);border:1px solid var(--green);max-height:70vh;overflow-y:auto;" onclick="event.stopPropagation()">
+      <div style="padding:0.75rem 1rem;border-bottom:1px solid var(--border);font-size:0.75rem;color:var(--fg-dim);display:flex;justify-content:space-between;align-items:center;">
+        <span>$ clawctl search "<span id="search-query-display"></span>"</span>
+        <button onclick="closeSearch()" class="btn-terminal" style="padding:0.125rem 0.5rem;font-size:0.65rem;">ESC</button>
+      </div>
+      <div id="search-results" style="padding:0.75rem 1rem;font-size:0.75rem;"></div>
     </div>
   </div>
 
@@ -1315,8 +1332,21 @@ function renderDetail(task, messages) {
             &gt; COMPLETE
           </button>
         ` : ''}
+        ${task.status === 'review' ? `
+          <button onclick="approveTask(${task.id})" class="btn-sheet" style="border-color:var(--green);color:var(--green);" data-primary="true">
+            &gt; APPROVE
+          </button>
+          <button onclick="rejectTask(${task.id})" class="btn-sheet delete">
+            &gt; REJECT
+          </button>
+        ` : ''}
         ${task.status === 'done' ? `
           <div class="completed-badge glow-green">[COMPLETED]</div>
+        ` : ''}
+        ${task.status === 'done' || task.status === 'cancelled' || task.status === 'blocked' ? `
+          <button onclick="resetTask(${task.id})" class="btn-sheet" style="border-color:var(--amber);color:var(--amber);">
+            &gt; RESET
+          </button>
         ` : ''}
         ${canDelete ? `
           <button onclick="deleteTask(${task.id})" class="btn-sheet delete">
@@ -1411,12 +1441,23 @@ function removeFocusTrap() {
 // KEYBOARD
 // ═══════════════════════════════════════════
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && state.selectedTask !== null) {
-    closeDetail();
+  if (e.key === 'Escape') {
+    if (document.getElementById('search-overlay').style.display !== 'none') {
+      closeSearch();
+      return;
+    }
+    if (state.selectedTask !== null) {
+      closeDetail();
+      return;
+    }
   }
-  if (e.key === 'f' && state.selectedTask === null && !e.ctrlKey && !e.metaKey
-      && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && !e.target.isContentEditable) {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+  if (e.key === 'f' && state.selectedTask === null && !e.ctrlKey && !e.metaKey) {
     toggleFeed();
+  }
+  if (e.key === '/' && state.selectedTask === null && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault();
+    document.getElementById('search-input').focus();
   }
 });
 
@@ -1457,6 +1498,101 @@ async function completeTask(taskId) {
     console.error('Complete failed:', e);
     await fetchBoard();
   }
+}
+
+async function approveTask(taskId) {
+  const note = prompt('Approval note (optional):') || '';
+  const task = state.tasks.find(t => t.id === taskId);
+  if (task) {
+    task.status = 'done';
+    renderBoard();
+  }
+  closeDetail();
+  try {
+    await api.post(`/api/task/${taskId}/approve`, { agent: 'dashboard', note });
+    await fetchBoard();
+  } catch (e) {
+    console.error('Approve failed:', e);
+    await fetchBoard();
+  }
+}
+
+async function rejectTask(taskId) {
+  const reason = prompt('Rejection reason:');
+  if (reason === null) return;
+  const task = state.tasks.find(t => t.id === taskId);
+  if (task) {
+    task.status = 'pending';
+    renderBoard();
+  }
+  closeDetail();
+  try {
+    await api.post(`/api/task/${taskId}/reject`, { agent: 'dashboard', reason });
+    await fetchBoard();
+  } catch (e) {
+    console.error('Reject failed:', e);
+    await fetchBoard();
+  }
+}
+
+async function resetTask(taskId) {
+  const task = state.tasks.find(t => t.id === taskId);
+  if (task) {
+    task.status = 'pending';
+    renderBoard();
+  }
+  closeDetail();
+  try {
+    await api.post(`/api/task/${taskId}/reset`, { agent: 'dashboard', force: true });
+    await fetchBoard();
+  } catch (e) {
+    console.error('Reset failed:', e);
+    await fetchBoard();
+  }
+}
+
+async function doSearch(e) {
+  e.preventDefault();
+  const q = document.getElementById('search-input').value.trim();
+  if (!q) return;
+  document.getElementById('search-query-display').textContent = q;
+  document.getElementById('search-results').innerHTML = '<div style="color:var(--fg-dim);">Searching...</div>';
+  document.getElementById('search-overlay').style.display = 'block';
+  try {
+    const data = await api.get(`/api/search?q=${encodeURIComponent(q)}`);
+    let html = '';
+    if (data.tasks.length > 0) {
+      html += '<div class="sheet-section-title"># Tasks (' + data.tasks.length + ')</div>';
+      html += data.tasks.map(t =>
+        '<div style="padding:0.375rem 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="closeSearch();setTimeout(()=>openDetail(' + t.id + '),100)">'
+        + '<span class="task-id">#' + t.id + '</span> '
+        + '<span style="color:var(--fg);">' + escapeHtml(t.subject) + '</span> '
+        + '<span class="task-badge" data-status="' + t.status + '" style="font-size:0.6rem;">' + t.status + '</span>'
+        + '</div>'
+      ).join('');
+    }
+    if (data.messages.length > 0) {
+      html += '<div class="sheet-section-title" style="margin-top:0.75rem;"># Messages (' + data.messages.length + ')</div>';
+      html += data.messages.map(m =>
+        '<div style="padding:0.375rem 0;border-bottom:1px solid var(--border);' + (m.task_id ? 'cursor:pointer;' : '') + '"'
+        + (m.task_id ? ' onclick="closeSearch();setTimeout(()=>openDetail(' + m.task_id + '),100)"' : '') + '>'
+        + '<span style="color:var(--green-dim);">' + escapeHtml(m.from_agent) + '</span> '
+        + '<span style="color:var(--fg);">' + escapeHtml(m.body) + '</span> '
+        + (m.task_id ? '<span style="color:var(--fg-dim);">#' + m.task_id + '</span>' : '')
+        + '</div>'
+      ).join('');
+    }
+    if (data.tasks.length === 0 && data.messages.length === 0) {
+      html = '<div style="color:var(--fg-dim);text-align:center;padding:1rem;">-- no results --</div>';
+    }
+    document.getElementById('search-results').innerHTML = html;
+  } catch (e) {
+    document.getElementById('search-results').innerHTML = '<div style="color:var(--red);">[ERROR] Search failed</div>';
+  }
+}
+
+function closeSearch(e) {
+  document.getElementById('search-overlay').style.display = 'none';
 }
 
 function toggleAgentFilter(agentName) {

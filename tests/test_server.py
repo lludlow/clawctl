@@ -211,3 +211,135 @@ class TestBlockersApi:
         client, _ = flask_client
         resp = client.get("/api/task/1/blockers")
         assert resp.status_code == 401
+
+
+# ── Approve Endpoint ────────────────────────────────
+
+
+class TestApproveEndpoint:
+    """POST /api/task/<id>/approve moves review task to done."""
+
+    def test_approves_review_task(self, flask_client):
+        client, token = flask_client
+        with db.get_db() as conn:
+            db.add_task(conn, "Task to approve", created_by="test", assignee="bob")
+            db.register_agent(conn, "bob")
+            db.review_task(conn, 1, "bob")
+        resp = client.post(
+            f"/api/task/1/approve?token={token}",
+            data=json.dumps({"agent": "dashboard", "note": "Looks good"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        assert resp.get_json()["success"] is True
+
+    def test_approve_non_review_returns_409(self, flask_client):
+        client, token = flask_client
+        with db.get_db() as conn:
+            db.add_task(conn, "Pending task", created_by="test")
+        resp = client.post(
+            f"/api/task/1/approve?token={token}",
+            data=json.dumps({"agent": "dashboard"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 409
+        assert resp.get_json()["success"] is False
+
+    def test_requires_token(self, flask_client):
+        client, _ = flask_client
+        resp = client.post("/api/task/1/approve")
+        assert resp.status_code == 401
+
+
+# ── Reject Endpoint ─────────────────────────────────
+
+
+class TestRejectEndpoint:
+    """POST /api/task/<id>/reject moves review task back to pending."""
+
+    def test_rejects_review_task(self, flask_client):
+        client, token = flask_client
+        with db.get_db() as conn:
+            db.add_task(conn, "Task to reject", created_by="test", assignee="bob")
+            db.register_agent(conn, "bob")
+            db.review_task(conn, 1, "bob")
+        resp = client.post(
+            f"/api/task/1/reject?token={token}",
+            data=json.dumps({"agent": "dashboard", "reason": "Needs work"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        assert resp.get_json()["success"] is True
+
+    def test_reject_non_review_returns_409(self, flask_client):
+        client, token = flask_client
+        with db.get_db() as conn:
+            db.add_task(conn, "Pending task", created_by="test")
+        resp = client.post(
+            f"/api/task/1/reject?token={token}",
+            data=json.dumps({"agent": "dashboard"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 409
+        assert resp.get_json()["success"] is False
+
+    def test_requires_token(self, flask_client):
+        client, _ = flask_client
+        resp = client.post("/api/task/1/reject")
+        assert resp.status_code == 401
+
+
+# ── Reset Endpoint ──────────────────────────────────
+
+
+class TestResetEndpoint:
+    """POST /api/task/<id>/reset moves task back to pending."""
+
+    def test_resets_cancelled_task(self, flask_client):
+        client, token = flask_client
+        with db.get_db() as conn:
+            db.add_task(conn, "Task to reset", created_by="test")
+            db.cancel_task(conn, 1, "test")
+        resp = client.post(
+            f"/api/task/1/reset?token={token}",
+            data=json.dumps({"agent": "dashboard"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        assert resp.get_json()["success"] is True
+
+    def test_requires_token(self, flask_client):
+        client, _ = flask_client
+        resp = client.post("/api/task/1/reset")
+        assert resp.status_code == 401
+
+
+# ── Search Endpoint ─────────────────────────────────
+
+
+class TestSearchEndpoint:
+    """GET /api/search returns matching tasks and messages."""
+
+    def test_returns_matching_tasks(self, flask_client):
+        client, token = flask_client
+        with db.get_db() as conn:
+            db.add_task(conn, "Fix login bug", created_by="test")
+            db.add_task(conn, "Update readme", created_by="test")
+        resp = client.get(f"/api/search?token={token}&q=login")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert len(data["tasks"]) == 1
+        assert data["tasks"][0]["subject"] == "Fix login bug"
+
+    def test_empty_query_returns_empty(self, flask_client):
+        client, token = flask_client
+        resp = client.get(f"/api/search?token={token}&q=")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["tasks"] == []
+        assert data["messages"] == []
+
+    def test_requires_token(self, flask_client):
+        client, _ = flask_client
+        resp = client.get("/api/search?q=test")
+        assert resp.status_code == 401
